@@ -20,7 +20,6 @@ from app.infrastructure.di.container import get_container
 from app.presentation.api.email_controller import router as email_router
 from app.presentation.api.user_controller import router as user_router
 from app.presentation.api.health_controller import router as health_router
-from app.presentation.api.oauth_controller import router as oauth_router
 
 # Keep the old routers for compatibility (temporary)
 from app.routers import firestore
@@ -76,10 +75,6 @@ tags_metadata = [
         "description": "User management operations with clean architecture implementation.",
     },
     {
-        "name": "auth",
-        "description": "Google OAuth authentication operations including login, callback, and token management.",
-    },
-    {
         "name": "firestore-legacy",
         "description": "Legacy Firestore endpoints (for backward compatibility).",
     },
@@ -88,7 +83,47 @@ tags_metadata = [
 # Create FastAPI instance with clean architecture configuration
 app = FastAPI(
     title=settings.app_name,
-    description="Email Agent API for managing emails and users with Firebase integration.",
+    description=f"""
+    ## {settings.app_name} - Clean Architecture Implementation
+    
+    A comprehensive FastAPI backend following **clean architecture principles**:
+    
+    ### 🏗️ Architecture Layers
+    
+    - **🎯 Domain Layer**: Core business logic, entities, and repository interfaces
+    - **🔄 Application Layer**: Use cases, DTOs, and application services  
+    - **🏭 Infrastructure Layer**: Repository implementations and external services
+    - **🌐 Presentation Layer**: API controllers and request/response models
+    
+    ### 🎯 Key Features
+    
+    - **🔥 Firebase/Firestore Integration**: Seamless cloud database operations
+    - **📧 Email Management**: Complete email lifecycle with business rules
+    - **👥 User Management**: User authentication and role-based access
+    - **🏥 Health Monitoring**: Application health and dependency status
+    - **📖 Auto Documentation**: Interactive API documentation with examples
+    - **🔧 Dependency Injection**: Clean separation of concerns
+    - **⚡ High Performance**: Built with FastAPI for optimal speed
+    
+    ### 🚀 Clean Architecture Benefits
+    
+    - **Testability**: Easy unit and integration testing
+    - **Maintainability**: Clear separation of concerns
+    - **Scalability**: Modular and extensible design
+    - **Independence**: Framework and database agnostic
+    - **Flexibility**: Easy to swap implementations
+    
+    ### 📚 Getting Started
+    
+    1. **Health Check**: `GET /api/health` - Verify service status
+    2. **Create Email**: `POST /api/emails` - Send your first email
+    3. **List Emails**: `GET /api/emails` - View your email history
+    4. **Explore Documentation**: Use the interactive interface below
+    
+    ---
+    
+    **Built with Clean Architecture** • **Domain-Driven Design** • **SOLID Principles**
+    """,
     version=settings.app_version,
     terms_of_service="https://example.com/terms/",
     contact={
@@ -120,7 +155,6 @@ app.add_middleware(
 app.include_router(health_router, prefix=settings.api_prefix, tags=["health"])
 app.include_router(email_router, prefix=settings.api_prefix, tags=["emails"])
 app.include_router(user_router, prefix=settings.api_prefix, tags=["users"])
-app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 
 # Include legacy routers for backward compatibility
 app.include_router(firestore.router, prefix=settings.api_prefix, tags=["firestore-legacy"])

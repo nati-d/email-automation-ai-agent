@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # CORS
     allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     
+    # Firebase
+    firebase_credentials_path: str = "turing-rush-466007-b2-firebase-adminsdk-fbsvc-8a2e3a7e05.json"
+    
     class Config:
         env_file = ".env"
         extra = "ignore"
