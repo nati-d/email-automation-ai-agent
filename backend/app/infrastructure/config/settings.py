@@ -7,6 +7,7 @@ Clean architecture configuration management.
 from pydantic_settings import BaseSettings
 from typing import List, Optional
 from functools import lru_cache
+import os
 
 
 class Settings(BaseSettings):
@@ -23,32 +24,32 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     
     # Database
-    database_url: str = "sqlite:///./email_agent.db"
+    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./email_agent.db")
     
     # Firebase
-    firebase_credentials_path: str = "turing-rush-466007-b2-firebase-adminsdk-fbsvc-8a2e3a7e05.json"
-    firebase_project_id: Optional[str] = None
+    firebase_credentials_path: Optional[str] = os.getenv("FIREBASE_CREDENTIALS_PATH")
+    firebase_project_id: Optional[str] = os.getenv("FIREBASE_PROJECT_ID")
     
     # Redis
-    redis_url: str = "redis://localhost:6379/0"
-    redis_enabled: bool = False
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_enabled: bool = os.getenv("REDIS_ENABLED", "false").lower() == "true"
     
     # Email Service
-    smtp_server: str = "smtp.gmail.com"
-    smtp_port: int = 587
-    smtp_username: str = ""
-    smtp_password: str = ""
-    smtp_use_tls: bool = True
+    smtp_server: str = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username: str = os.getenv("SMTP_USERNAME", "")
+    smtp_password: str = os.getenv("SMTP_PASSWORD", "")
+    smtp_use_tls: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     
     # Authentication
-    secret_key: str = "your-secret-key-change-in-production"
-    algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    secret_key: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+    algorithm: str = os.getenv("ALGORITHM", "HS256")
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
     # Google OAuth
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_redirect_uri: str = "http://localhost:8000/api/auth/google/callback"
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
     google_scopes: List[str] = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
@@ -56,10 +57,10 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.send"
     ]
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # CORS
-    allowed_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    allowed_origins: List[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
     
     # Logging
     log_level: str = "INFO"
