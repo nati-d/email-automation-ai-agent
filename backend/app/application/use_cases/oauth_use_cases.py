@@ -70,6 +70,23 @@ class InitiateOAuthLoginUseCase(OAuthUseCaseBase):
 class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
     """Use case for processing OAuth callback"""
     
+    def __init__(
+        self,
+        oauth_repository,
+        user_repository,
+        oauth_service,
+        fetch_emails_use_case=None
+    ):
+        super().__init__(oauth_repository, user_repository, oauth_service)
+        self.fetch_emails_use_case = fetch_emails_use_case
+        
+        # Debug logging to verify dependencies
+        print(f"🔧 ProcessOAuthCallbackUseCase initialized:")
+        print(f"   - oauth_repository: {type(oauth_repository).__name__}")
+        print(f"   - user_repository: {type(user_repository).__name__}")
+        print(f"   - oauth_service: {type(oauth_service).__name__}")
+        print(f"   - fetch_emails_use_case: {type(fetch_emails_use_case).__name__ if fetch_emails_use_case else 'None'}")
+    
     async def execute(
         self, 
         code: str, 
@@ -78,25 +95,45 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
     ) -> Dict[str, Any]:
         """Process OAuth callback and create/authenticate user"""
         
+        print(f"🔄 ProcessOAuthCallbackUseCase.execute called with:")
+        print(f"   - code: {code[:10] if code else 'None'}...")
+        print(f"   - state: {state[:10] if state else 'None'}...")
+        print(f"   - error: {error}")
+        
         if error:
+            print(f"❌ OAuth error received: {error}")
             raise DomainValidationError(f"OAuth error: {error}")
         
         if not code:
+            print("❌ No authorization code provided")
             raise DomainValidationError("Authorization code is required")
         
         if not state:
+            print("❌ No state parameter provided")
             raise DomainValidationError("State parameter is required")
         
         try:
             print(f"🔄 Processing OAuth callback - Code: {code[:10]}..., State: {state[:10]}...")
+            print(f"🔧 DEBUG: Available instance attributes: {[attr for attr in dir(self) if not attr.startswith('_')]}")
             
             # Exchange code for tokens
             try:
                 print("🔄 Exchanging authorization code for tokens...")
+                print(f"🔧 DEBUG: self.oauth_service type: {type(self.oauth_service).__name__}")
+                print(f"🔧 DEBUG: self.oauth_service has exchange_code_for_tokens: {hasattr(self.oauth_service, 'exchange_code_for_tokens')}")
+                
+                if not hasattr(self.oauth_service, 'exchange_code_for_tokens'):
+                    print(f"❌ CRITICAL: oauth_service is wrong type: {type(self.oauth_service)}")
+                    print(f"❌ Available methods: {[method for method in dir(self.oauth_service) if not method.startswith('_')]}")
+                    raise DomainValidationError(f"OAuth service is incorrect type: {type(self.oauth_service).__name__}")
+                
                 token = self.oauth_service.exchange_code_for_tokens(code, state)
                 print(f"✅ Token exchange successful - Access token: {token.access_token[:20]}...")
             except Exception as e:
                 print(f"❌ Token exchange failed: {str(e)}")
+                print(f"❌ Exception type: {type(e).__name__}")
+                import traceback
+                print(f"❌ Full traceback: {traceback.format_exc()}")
                 raise DomainValidationError(f"Token exchange failed: {str(e)}")
             
             # Get user information
@@ -172,12 +209,47 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
             
             try:
                 print("🔄 Preparing return data...")
+                is_new_user = existing_user is None
+                
                 result = {
                     "user": self._user_entity_to_dto(user),
                     "session_id": oauth_session.id,
                     "access_token": token.access_token,
-                    "is_new_user": existing_user is None
+                    "is_new_user": is_new_user
                 }
+                
+                # Fetch initial emails for new users
+                if is_new_user and self.fetch_emails_use_case:
+                    try:
+                        print("🔄 Fetching initial emails for new user...")
+                        print(f"🔧 DEBUG: fetch_emails_use_case type: {type(self.fetch_emails_use_case).__name__}")
+                        print(f"🔧 DEBUG: token type: {type(token).__name__}")
+                        print(f"🔧 DEBUG: user email: {user.email.value}")
+                        
+                        email_result = await self.fetch_emails_use_case.execute(
+                            oauth_token=token,
+                            user_email=user.email.value,
+                            limit=50
+                        )
+                        result["email_import"] = email_result
+                        print(f"✅ Email import result: {email_result}")
+                        print(f"📊 Emails imported: {email_result.get('emails_imported', 0)}")
+                    except Exception as e:
+                        print(f"⚠️ Failed to fetch initial emails, but continuing: {str(e)}")
+                        print(f"⚠️ Email fetch error type: {type(e).__name__}")
+                        import traceback
+                        print(f"⚠️ Email fetch traceback: {traceback.format_exc()}")
+                        result["email_import"] = {
+                            "success": False,
+                            "error": str(e),
+                            "message": "Failed to import emails but registration succeeded"
+                        }
+                else:
+                    if not is_new_user:
+                        print("ℹ️ Skipping email fetch - existing user")
+                    if not self.fetch_emails_use_case:
+                        print("⚠️ Skipping email fetch - fetch_emails_use_case is None")
+                
                 print("✅ OAuth callback processed successfully!")
                 return result
             except Exception as e:

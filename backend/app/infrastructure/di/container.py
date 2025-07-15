@@ -12,6 +12,7 @@ from ..config.settings import Settings, get_settings
 from ..external_services.firebase_service import FirebaseService
 from ..external_services.email_service import EmailService
 from ..external_services.google_oauth_service import GoogleOAuthService
+from ..external_services.gmail_service import GmailService
 from ..repositories.firestore_email_repository import FirestoreEmailRepository
 from ..repositories.firestore_user_repository import FirestoreUserRepository
 from ..repositories.firestore_oauth_repository import FirestoreOAuthRepository
@@ -25,7 +26,7 @@ from ...domain.repositories.oauth_repository import OAuthRepository
 from ...application.use_cases.email_use_cases import (
     CreateEmailUseCase, GetEmailUseCase, UpdateEmailUseCase,
     DeleteEmailUseCase, SendEmailUseCase, ScheduleEmailUseCase,
-    ListEmailsUseCase
+    ListEmailsUseCase, FetchInitialEmailsUseCase
 )
 from ...application.use_cases.user_use_cases import (
     CreateUserUseCase, GetUserUseCase, UpdateUserUseCase,
@@ -45,6 +46,7 @@ class Container:
         self._firebase_service: Optional[FirebaseService] = None
         self._email_service: Optional[EmailService] = None
         self._google_oauth_service: Optional[GoogleOAuthService] = None
+        self._gmail_service: Optional[GmailService] = None
         self._email_repository: Optional[EmailRepository] = None
         self._user_repository: Optional[UserRepository] = None
         self._oauth_repository: Optional[OAuthRepository] = None
@@ -57,6 +59,7 @@ class Container:
         self._send_email_use_case: Optional[SendEmailUseCase] = None
         self._schedule_email_use_case: Optional[ScheduleEmailUseCase] = None
         self._list_emails_use_case: Optional[ListEmailsUseCase] = None
+        self._fetch_initial_emails_use_case: Optional[FetchInitialEmailsUseCase] = None
         
         # User use cases
         self._create_user_use_case: Optional[CreateUserUseCase] = None
@@ -97,6 +100,12 @@ class Container:
         if self._google_oauth_service is None:
             self._google_oauth_service = GoogleOAuthService(self.settings())
         return self._google_oauth_service
+    
+    def gmail_service(self) -> GmailService:
+        """Get Gmail service"""
+        if self._gmail_service is None:
+            self._gmail_service = GmailService()
+        return self._gmail_service
     
     # Repositories
     def email_repository(self) -> EmailRepository:
@@ -166,6 +175,22 @@ class Container:
             self._list_emails_use_case = ListEmailsUseCase(self.email_repository())
         return self._list_emails_use_case
     
+    def fetch_initial_emails_use_case(self) -> FetchInitialEmailsUseCase:
+        """Get fetch initial emails use case"""
+        if self._fetch_initial_emails_use_case is None:
+            email_repo = self.email_repository()
+            gmail_svc = self.gmail_service()
+            
+            print(f"🔧 Creating FetchInitialEmailsUseCase with:")
+            print(f"   - email_repository: {type(email_repo).__name__}")
+            print(f"   - gmail_service: {type(gmail_svc).__name__}")
+            
+            self._fetch_initial_emails_use_case = FetchInitialEmailsUseCase(
+                email_repo,
+                gmail_svc
+            )
+        return self._fetch_initial_emails_use_case
+    
     # User Use Cases
     def create_user_use_case(self) -> CreateUserUseCase:
         """Get create user use case"""
@@ -211,10 +236,23 @@ class Container:
     def process_oauth_callback_use_case(self) -> ProcessOAuthCallbackUseCase:
         """Get process OAuth callback use case"""
         if self._process_oauth_callback_use_case is None:
+            # Debug logging
+            oauth_service = self.google_oauth_service()
+            oauth_repository = self.oauth_repository()
+            user_repository = self.user_repository()
+            fetch_emails_use_case = self.fetch_initial_emails_use_case()
+            
+            print(f"🔧 Creating ProcessOAuthCallbackUseCase with:")
+            print(f"   - oauth_service: {type(oauth_service).__name__}")
+            print(f"   - oauth_repository: {type(oauth_repository).__name__}")
+            print(f"   - user_repository: {type(user_repository).__name__}")
+            print(f"   - fetch_emails_use_case: {type(fetch_emails_use_case).__name__}")
+            
             self._process_oauth_callback_use_case = ProcessOAuthCallbackUseCase(
-                oauth_repository=self.oauth_repository(),
-                user_repository=self.user_repository(),
-                oauth_service=self.google_oauth_service()
+                oauth_repository=oauth_repository,
+                user_repository=user_repository,
+                oauth_service=oauth_service,
+                fetch_emails_use_case=fetch_emails_use_case
             )
         return self._process_oauth_callback_use_case
     

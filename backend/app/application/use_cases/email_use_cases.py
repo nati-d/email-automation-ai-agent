@@ -4,7 +4,7 @@ Email Use Cases
 Business use cases for email operations.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from ...domain.entities.email import Email, EmailStatus
@@ -190,3 +190,78 @@ class ListEmailsUseCase(EmailUseCaseBase):
             page=1,
             page_size=limit
         ) 
+
+
+class FetchInitialEmailsUseCase(EmailUseCaseBase):
+    """Use case for fetching initial emails for new users"""
+    
+    def __init__(
+        self, 
+        email_repository: EmailRepository,
+        gmail_service
+    ):
+        super().__init__(email_repository)
+        self.gmail_service = gmail_service
+    
+    async def execute(self, oauth_token, user_email: str, limit: int = 50) -> Dict[str, Any]:
+        """Fetch initial emails from Gmail and store them"""
+        try:
+            print(f"🔄 FetchInitialEmailsUseCase.execute called:")
+            print(f"   - user_email: {user_email}")
+            print(f"   - limit: {limit}")
+            print(f"   - oauth_token type: {type(oauth_token).__name__}")
+            print(f"   - gmail_service type: {type(self.gmail_service).__name__}")
+            print(f"   - email_repository type: {type(self.email_repository).__name__}")
+            
+            # Fetch emails from Gmail
+            print("🔄 Calling gmail_service.fetch_recent_emails...")
+            emails = await self.gmail_service.fetch_recent_emails(oauth_token, user_email, limit)
+            print(f"📧 Gmail service returned {len(emails) if emails else 0} emails")
+            
+            if not emails:
+                print("⚠️ No emails found to import")
+                return {
+                    "success": True,
+                    "emails_imported": 0,
+                    "message": "No emails found to import"
+                }
+            
+            # Store emails in repository
+            stored_count = 0
+            failed_count = 0
+            for i, email in enumerate(emails):
+                try:
+                    print(f"🔄 Storing email {i+1}/{len(emails)}: {email.subject[:50]}...")
+                    saved_email = await self.email_repository.save(email)
+                    print(f"✅ Stored email with ID: {saved_email.id}")
+                    stored_count += 1
+                except Exception as e:
+                    print(f"⚠️ Failed to store email {email.subject}: {str(e)}")
+                    print(f"⚠️ Storage error type: {type(e).__name__}")
+                    failed_count += 1
+                    continue
+            
+            print(f"✅ Email import complete:")
+            print(f"   - Successfully imported: {stored_count}")
+            print(f"   - Failed to import: {failed_count}")
+            print(f"   - Total processed: {len(emails)}")
+            
+            return {
+                "success": True,
+                "emails_imported": stored_count,
+                "emails_failed": failed_count,
+                "total_found": len(emails),
+                "message": f"Successfully imported {stored_count} emails"
+            }
+            
+        except Exception as e:
+            print(f"❌ Failed to fetch initial emails: {str(e)}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
+            return {
+                "success": False,
+                "emails_imported": 0,
+                "error": str(e),
+                "message": "Failed to import emails"
+            } 

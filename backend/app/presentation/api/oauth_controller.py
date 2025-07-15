@@ -167,6 +167,7 @@ async def google_oauth_callback(
     """
     try:
         print(f"🔄 OAuth callback received - Code: {code[:10] if code else 'None'}..., State: {state[:10] if state else 'None'}..., Error: {error}")
+        print(f"🔧 OAuth Controller - Use case type: {type(use_case).__name__}")
         
         # Handle OAuth errors
         if error:
@@ -178,8 +179,15 @@ async def google_oauth_callback(
         
         # Process OAuth callback
         print("🔄 Processing OAuth callback with use case...")
-        result = await use_case.execute(code=code, state=state, error=error)
-        print(f"✅ Use case executed successfully for user: {result['user'].email}")
+        try:
+            result = await use_case.execute(code=code, state=state, error=error)
+            print(f"✅ Use case executed successfully for user: {result['user'].email}")
+        except Exception as use_case_error:
+            print(f"❌ Use case execution failed: {str(use_case_error)}")
+            print(f"❌ Use case error type: {type(use_case_error).__name__}")
+            import traceback
+            print(f"❌ Use case traceback: {traceback.format_exc()}")
+            raise use_case_error
         
         user = result["user"]
         
@@ -192,6 +200,14 @@ async def google_oauth_callback(
             f"session_id={result['session_id']}",
             f"is_new_user={str(result['is_new_user']).lower()}"
         ]
+        
+        # Add email import results if available
+        if "email_import" in result:
+            email_import = result["email_import"]
+            redirect_params.append(f"emails_imported={email_import.get('emails_imported', 0)}")
+            redirect_params.append(f"email_import_success={str(email_import.get('success', False)).lower()}")
+            if email_import.get('error'):
+                redirect_params.append(f"email_import_error={email_import['error'][:100]}")  # Truncate error
         
         redirect_url = f"{settings.frontend_url}/auth-success?{'&'.join(redirect_params)}"
         print(f"✅ OAuth authentication successful! Redirecting to: {redirect_url}")
