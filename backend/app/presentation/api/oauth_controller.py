@@ -166,36 +166,49 @@ async def google_oauth_callback(
     - All errors are handled gracefully with frontend redirects
     """
     try:
+        print(f"🔄 OAuth callback received - Code: {code[:10] if code else 'None'}..., State: {state[:10] if state else 'None'}..., Error: {error}")
+        
         # Handle OAuth errors
         if error:
             error_msg = error_description or error
+            print(f"❌ OAuth error from Google: {error} - {error_msg}")
             redirect_url = f"{settings.frontend_url}/login?error={error}&message={error_msg}"
+            print(f"🔄 Redirecting to error page: {redirect_url}")
             return RedirectResponse(url=redirect_url)
         
         # Process OAuth callback
+        print("🔄 Processing OAuth callback with use case...")
         result = await use_case.execute(code=code, state=state, error=error)
+        print(f"✅ Use case executed successfully for user: {result['user'].email}")
         
         user = result["user"]
         
         # Build success redirect URL with user info
         redirect_params = [
             f"status=success",
-            f"email={user['email']}",
-            f"name={user['name']}",
-            f"user_id={user['id']}",
+            f"email={user.email}",
+            f"name={user.name}",
+            f"user_id={user.id}",
             f"is_new_user={str(result['is_new_user']).lower()}"
         ]
         
         redirect_url = f"{settings.frontend_url}/auth-success?{'&'.join(redirect_params)}"
+        print(f"✅ OAuth authentication successful! Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)
         
     except DomainException as e:
         # Redirect to frontend with error
+        print(f"❌ Domain exception in OAuth callback: {str(e)}")
         redirect_url = f"{settings.frontend_url}/login?error=oauth_error&message={str(e)}"
+        print(f"🔄 Redirecting to error page: {redirect_url}")
         return RedirectResponse(url=redirect_url)
     except Exception as e:
         # Redirect to frontend with general error
+        print(f"❌ Unexpected exception in OAuth callback: {str(e)}")
+        import traceback
+        print(f"❌ Callback traceback: {traceback.format_exc()}")
         redirect_url = f"{settings.frontend_url}/login?error=server_error&message=Authentication failed"
+        print(f"🔄 Redirecting to error page: {redirect_url}")
         return RedirectResponse(url=redirect_url)
 
 

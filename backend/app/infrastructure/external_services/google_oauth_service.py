@@ -27,6 +27,23 @@ class GoogleOAuthService:
         self.client_secret = settings.google_client_secret
         self.redirect_uri = settings.google_redirect_uri
         self.scopes = settings.google_scopes
+        
+        # Validate OAuth configuration
+        self._validate_config()
+    
+    def _validate_config(self) -> None:
+        """Validate OAuth configuration"""
+        if not self.client_id or self.client_id.strip() == "":
+            raise Exception("Google Client ID is not configured. Please set GOOGLE_CLIENT_ID environment variable.")
+        
+        if not self.client_secret or self.client_secret.strip() == "":
+            raise Exception("Google Client Secret is not configured. Please set GOOGLE_CLIENT_SECRET environment variable.")
+        
+        if not self.redirect_uri or self.redirect_uri.strip() == "":
+            raise Exception("Google Redirect URI is not configured. Please set GOOGLE_REDIRECT_URI environment variable.")
+        
+        if not self.scopes or len(self.scopes) == 0:
+            raise Exception("Google OAuth scopes are not configured.")
     
     def generate_state(self) -> str:
         """Generate a secure state parameter for OAuth"""
@@ -78,16 +95,38 @@ class GoogleOAuthService:
         flow.redirect_uri = self.redirect_uri
         
         # Fetch token
-        flow.fetch_token(code=code)
+        try:
+            print(f"🔄 Fetching token with code: {code[:10]}...")
+            flow.fetch_token(code=code)
+            print("✅ Token fetched successfully from Google")
+        except Exception as e:
+            print(f"❌ Google token fetch failed: {str(e)}")
+            import traceback
+            print(f"❌ Token fetch traceback: {traceback.format_exc()}")
+            raise Exception(f"Failed to exchange authorization code for tokens: {str(e)}")
         
         # Extract token information
         credentials = flow.credentials
+        
+        if not credentials.token:
+            print("❌ No access token in credentials")
+            raise Exception("No access token received from Google")
+        
+        print(f"✅ Access token received: {credentials.token[:20]}...")
+        
+        # Calculate expires_in from credentials
+        expires_in = 3600  # Default to 1 hour
+        if credentials.expiry:
+            from datetime import datetime
+            expires_in = int((credentials.expiry - datetime.utcnow()).total_seconds())
+            if expires_in <= 0:
+                expires_in = 3600  # Fallback if already expired
         
         # Create OAuth token value object
         return OAuthToken.create(
             access_token=credentials.token,
             refresh_token=credentials.refresh_token,
-            expires_in=3600,  # Default to 1 hour
+            expires_in=expires_in,
             scope=" ".join(self.scopes)
         )
     
@@ -98,19 +137,38 @@ class GoogleOAuthService:
             'Accept': 'application/json'
         }
         
-        # Get user info from Google
+        # Get user info from Google OpenID Connect endpoint (more reliable for 'sub' field)
+        print(f"🔄 Requesting user info from Google OpenID Connect...")
         response = requests.get(
-            'https://www.googleapis.com/oauth2/v2/userinfo',
+            'https://openidconnect.googleapis.com/v1/userinfo',
             headers=headers
         )
         
+        print(f"🔄 Google userinfo response status: {response.status_code}")
+        
         if response.status_code != 200:
+            print(f"❌ Google userinfo request failed: {response.text}")
             raise Exception(f"Failed to get user info: {response.text}")
         
         user_data = response.json()
+        print(f"✅ User data received from Google: {user_data}")
+        
+        # Validate that we got the required sub field
+        if not user_data.get('sub'):
+            print(f"❌ Missing 'sub' field in Google response: {user_data}")
+            raise Exception("Google did not return a valid user ID (sub field missing)")
+        
+        print(f"✅ Valid user data with sub: {user_data.get('sub')}")
         
         # Create OAuth user info value object
-        return OAuthUserInfo.create_from_google(user_data)
+        try:
+            oauth_user_info = OAuthUserInfo.create_from_google(user_data)
+            print(f"✅ OAuthUserInfo created successfully for: {oauth_user_info.email}")
+            return oauth_user_info
+        except Exception as e:
+            print(f"❌ Failed to create OAuthUserInfo: {str(e)}")
+            print(f"❌ User data was: {user_data}")
+            raise Exception(f"Failed to create OAuth user info: {str(e)}")
     
     def refresh_access_token(self, refresh_token: str) -> OAuthToken:
         """Refresh access token using refresh token"""

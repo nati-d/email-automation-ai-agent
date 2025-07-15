@@ -88,48 +88,107 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
             raise DomainValidationError("State parameter is required")
         
         try:
+            print(f"🔄 Processing OAuth callback - Code: {code[:10]}..., State: {state[:10]}...")
+            
             # Exchange code for tokens
-            token = self.oauth_service.exchange_code_for_tokens(code, state)
+            try:
+                print("🔄 Exchanging authorization code for tokens...")
+                token = self.oauth_service.exchange_code_for_tokens(code, state)
+                print(f"✅ Token exchange successful - Access token: {token.access_token[:20]}...")
+            except Exception as e:
+                print(f"❌ Token exchange failed: {str(e)}")
+                raise DomainValidationError(f"Token exchange failed: {str(e)}")
             
             # Get user information
-            user_info = self.oauth_service.get_user_info(token.access_token)
+            try:
+                print("🔄 Getting user information from Google...")
+                user_info = self.oauth_service.get_user_info(token.access_token)
+                print(f"✅ User info retrieved - Email: {user_info.email}, Name: {user_info.name}")
+            except Exception as e:
+                print(f"❌ Failed to get user info: {str(e)}")
+                raise DomainValidationError(f"Failed to get user info: {str(e)}")
             
             # Create OAuth session
-            oauth_session = OAuthSession(
-                user_id=None,  # Will be set after user creation/authentication
-                token=token,
-                user_info=user_info,
-                state=state
-            )
+            try:
+                print("🔄 Creating OAuth session...")
+                oauth_session = OAuthSession(
+                    user_id=None,  # Will be set after user creation/authentication
+                    token=token,
+                    user_info=user_info,
+                    state=state
+                )
+                print("✅ OAuth session created successfully")
+            except Exception as e:
+                print(f"❌ Failed to create OAuth session: {str(e)}")
+                raise DomainValidationError(f"Failed to create OAuth session: {str(e)}")
             
             # Check if user exists
-            existing_user = await self.user_repository.find_by_email(user_info.email)
-            
-            if existing_user:
-                # Existing user - authenticate
-                user = await self._authenticate_existing_user(existing_user, oauth_session)
-            else:
-                # New user - create account
-                user = await self._create_new_user(oauth_session)
+            try:
+                print(f"🔄 Checking if user exists for email: {user_info.email}")
+                existing_user = await self.user_repository.find_by_email(user_info.email)
+                
+                if existing_user:
+                    print(f"✅ Found existing user: {existing_user.id}")
+                    # Existing user - authenticate
+                    user = await self._authenticate_existing_user(existing_user, oauth_session)
+                    print("✅ Existing user authenticated successfully")
+                else:
+                    print("🔄 No existing user found, creating new user...")
+                    # New user - create account
+                    user = await self._create_new_user(oauth_session)
+                    print(f"✅ New user created: {user.id}")
+            except Exception as e:
+                print(f"❌ Failed during user creation/authentication: {str(e)}")
+                raise DomainValidationError(f"Failed during user creation/authentication: {str(e)}")
             
             # Associate session with user
-            oauth_session.associate_user(user.id)
+            try:
+                print("🔄 Associating session with user...")
+                oauth_session.associate_user(user.id)
+                print("✅ Session associated with user")
+            except Exception as e:
+                print(f"❌ Failed to associate session with user: {str(e)}")
+                raise DomainValidationError(f"Failed to associate session with user: {str(e)}")
             
             # Save OAuth session
-            await self.oauth_repository.save_session(oauth_session)
+            try:
+                print("🔄 Saving OAuth session...")
+                await self.oauth_repository.save_session(oauth_session)
+                print("✅ OAuth session saved successfully")
+            except Exception as e:
+                print(f"❌ Failed to save OAuth session: {str(e)}")
+                raise DomainValidationError(f"Failed to save OAuth session: {str(e)}")
             
             # Update user's last login
-            user.update_last_login()
-            await self.user_repository.update(user)
+            try:
+                print("🔄 Updating user's last login...")
+                user.update_last_login()
+                await self.user_repository.update(user)
+                print("✅ User's last login updated")
+            except Exception as e:
+                print(f"❌ Failed to update user's last login: {str(e)}")
+                # Don't fail the whole flow for this
+                print("⚠️ Continuing despite last login update failure...")
             
-            return {
-                "user": self._user_entity_to_dto(user),
-                "session_id": oauth_session.id,
-                "access_token": token.access_token,
-                "is_new_user": existing_user is None
-            }
+            try:
+                print("🔄 Preparing return data...")
+                result = {
+                    "user": self._user_entity_to_dto(user),
+                    "session_id": oauth_session.id,
+                    "access_token": token.access_token,
+                    "is_new_user": existing_user is None
+                }
+                print("✅ OAuth callback processed successfully!")
+                return result
+            except Exception as e:
+                print(f"❌ Failed to prepare return data: {str(e)}")
+                raise DomainValidationError(f"Failed to prepare return data: {str(e)}")
             
         except Exception as e:
+            print(f"❌ OAuth callback processing failed: {str(e)}")
+            print(f"❌ Exception type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
             raise DomainValidationError(f"Failed to process OAuth callback: {str(e)}")
     
     async def _authenticate_existing_user(

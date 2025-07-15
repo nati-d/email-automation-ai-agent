@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google OAuth Test - Email Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 2.5em;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .login-section {
+            margin: 30px 0;
+        }
+
+        .google-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            min-width: 200px;
+            justify-content: center;
+        }
+
+        .google-btn:hover {
+            background: #3367d6;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(66, 133, 244, 0.3);
+        }
+
+        .google-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .google-icon {
+            width: 20px;
+            height: 20px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="white" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="white" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="white" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="white" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>') no-repeat center;
+            background-size: contain;
+        }
+
+        .user-info {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .user-info h3 {
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .user-detail {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .user-detail:last-child {
+            border-bottom: none;
+        }
+
+        .user-detail label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .user-detail span {
+            color: #333;
+        }
+
+        .profile-pic {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: block;
+            object-fit: cover;
+            border: 3px solid #667eea;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
+        }
+
+        .loading {
+            display: none;
+            color: #666;
+            font-style: italic;
+            margin: 10px 0;
+        }
+
+        .error {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #f5c6cb;
+        }
+
+        .success {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        .status-indicator.disconnected {
+            background: #dc3545;
+        }
+
+        .api-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="api-status" id="api-status">
+        <span class="status-indicator disconnected" id="status-indicator"></span>
+        <span id="status-text">Checking API...</span>
+    </div>
+
+    <div class="container">
+        <div class="logo">📧 Email Agent</div>
+        <div class="subtitle">Google OAuth Test Interface</div>
+
+        <!-- Login Section -->
+        <div class="login-section" id="login-section">
+            <p style="margin-bottom: 20px; color: #666;">
+                Test the Google OAuth integration by clicking the button below
+            </p>
+            <button class="google-btn" id="login-btn" onclick="initiateLogin()">
+                <span class="google-icon"></span>
+                Sign in with Google
+            </button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            Processing authentication...
+        </div>
+
+        <!-- Error Display -->
+        <div class="error" id="error-message"></div>
+
+        <!-- Success Display -->
+        <div class="success" id="success-message"></div>
+
+        <!-- User Info Section -->
+        <div class="user-info" id="user-info">
+            <h3>👤 User Information</h3>
+            <img id="profile-picture" class="profile-pic" style="display: none;">
+            <div class="user-detail">
+                <label>Name:</label>
+                <span id="user-name">-</span>
+            </div>
+            <div class="user-detail">
+                <label>Email:</label>
+                <span id="user-email">-</span>
+            </div>
+            <div class="user-detail">
+                <label>User ID:</label>
+                <span id="user-id">-</span>
+            </div>
+            <div class="user-detail">
+                <label>New User:</label>
+                <span id="is-new-user">-</span>
+            </div>
+            <div class="user-detail">
+                <label>Login Time:</label>
+                <span id="login-time">-</span>
+            </div>
+            <div style="text-align: center;">
+                <button class="logout-btn" onclick="logout()">
+                    🚪 Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:8000/api';
+        let sessionId = null;
+
+        // Check API status on load
+        window.addEventListener('load', async () => {
+            await checkApiStatus();
+            checkAuthParams();
+        });
+
+        // Check if API is running
+        async function checkApiStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (response.ok) {
+                    document.getElementById('status-indicator').className = 'status-indicator connected';
+                    document.getElementById('status-text').textContent = 'API Connected';
+                } else {
+                    throw new Error('API not responding');
+                }
+            } catch (error) {
+                document.getElementById('status-indicator').className = 'status-indicator disconnected';
+                document.getElementById('status-text').textContent = 'API Disconnected';
+                showError('Cannot connect to API. Make sure the FastAPI server is running on http://localhost:8000');
+            }
+        }
+
+        // Check for auth success/error parameters in URL
+        function checkAuthParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            if (urlParams.get('status') === 'success') {
+                // Authentication successful
+                const userData = {
+                    name: urlParams.get('name'),
+                    email: urlParams.get('email'),
+                    id: urlParams.get('user_id'),
+                    isNewUser: urlParams.get('is_new_user') === 'true'
+                };
+                
+                showUserInfo(userData);
+                showSuccess('Authentication successful! Welcome ' + userData.name);
+                
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+            } else if (urlParams.get('error')) {
+                // Authentication failed
+                const error = urlParams.get('error');
+                const message = urlParams.get('message') || 'Authentication failed';
+                showError(`Authentication Error (${error}): ${message}`);
+                
+                // Clean URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        }
+
+        // Initiate Google OAuth login
+        async function initiateLogin() {
+            hideMessages();
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${API_BASE}/auth/google/login`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store state for security
+                    localStorage.setItem('oauth_state', data.state);
+                    
+                    // Redirect to Google OAuth
+                    window.location.href = data.authorization_url;
+                } else {
+                    throw new Error(data.detail?.message || 'Failed to initiate login');
+                }
+            } catch (error) {
+                showError('Failed to initiate login: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Logout user
+        async function logout() {
+            if (!sessionId) {
+                showError('No active session to logout');
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ session_id: sessionId })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    sessionId = null;
+                    hideUserInfo();
+                    showLoginSection();
+                    showSuccess('Successfully logged out');
+                } else {
+                    throw new Error(data.detail?.message || 'Logout failed');
+                }
+            } catch (error) {
+                showError('Logout failed: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Show user information
+        function showUserInfo(userData) {
+            document.getElementById('user-name').textContent = userData.name || '-';
+            document.getElementById('user-email').textContent = userData.email || '-';
+            document.getElementById('user-id').textContent = userData.id || '-';
+            document.getElementById('is-new-user').textContent = userData.isNewUser ? 'Yes' : 'No';
+            document.getElementById('login-time').textContent = new Date().toLocaleString();
+
+            // Show profile picture if available
+            if (userData.profilePicture) {
+                const profilePic = document.getElementById('profile-picture');
+                profilePic.src = userData.profilePicture;
+                profilePic.style.display = 'block';
+            }
+
+            document.getElementById('user-info').style.display = 'block';
+            document.getElementById('login-section').style.display = 'none';
+        }
+
+        // Show login section
+        function showLoginSection() {
+            document.getElementById('login-section').style.display = 'block';
+            document.getElementById('user-info').style.display = 'none';
+        }
+
+        // Hide user info
+        function hideUserInfo() {
+            document.getElementById('user-info').style.display = 'none';
+        }
+
+        // Show loading state
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('login-btn').disabled = show;
+        }
+
+        // Show error message
+        function showError(message) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+        }
+
+        // Show success message
+        function showSuccess(message) {
+            const successEl = document.getElementById('success-message');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+        }
+
+        // Hide all messages
+        function hideMessages() {
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
