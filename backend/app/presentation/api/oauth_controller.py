@@ -189,6 +189,7 @@ async def google_oauth_callback(
             f"email={user.email}",
             f"name={user.name}",
             f"user_id={user.id}",
+            f"session_id={result['session_id']}",
             f"is_new_user={str(result['is_new_user']).lower()}"
         ]
         

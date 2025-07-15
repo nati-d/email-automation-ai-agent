@@ -258,6 +258,10 @@
                 <span id="is-new-user">-</span>
             </div>
             <div class="user-detail">
+                <label>Session ID:</label>
+                <span id="session-id">-</span>
+            </div>
+            <div class="user-detail">
                 <label>Login Time:</label>
                 <span id="login-time">-</span>
             </div>
@@ -310,6 +314,9 @@
                     isNewUser: urlParams.get('is_new_user') === 'true'
                 };
                 
+                // Store session ID for logout
+                sessionId = urlParams.get('session_id');
+                
                 showUserInfo(userData);
                 showSuccess('Authentication successful! Welcome ' + userData.name);
                 
@@ -355,7 +362,7 @@
         // Logout user
         async function logout() {
             if (!sessionId) {
-                showError('No active session to logout');
+                showError('No active session to logout. Please log in first.');
                 return;
             }
 
@@ -363,12 +370,11 @@
             hideMessages();
 
             try {
-                const response = await fetch(`${API_BASE}/auth/logout`, {
+                const response = await fetch(`${API_BASE}/auth/logout?session_id=${sessionId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ session_id: sessionId })
+                    }
                 });
 
                 const data = await response.json();
@@ -377,7 +383,7 @@
                     sessionId = null;
                     hideUserInfo();
                     showLoginSection();
-                    showSuccess('Successfully logged out');
+                    showSuccess(data.message || 'Successfully logged out');
                 } else {
                     throw new Error(data.detail?.message || 'Logout failed');
                 }
@@ -394,6 +400,7 @@
             document.getElementById('user-email').textContent = userData.email || '-';
             document.getElementById('user-id').textContent = userData.id || '-';
             document.getElementById('is-new-user').textContent = userData.isNewUser ? 'Yes' : 'No';
+            document.getElementById('session-id').textContent = sessionId || '-';
             document.getElementById('login-time').textContent = new Date().toLocaleString();
 
             // Show profile picture if available
@@ -416,6 +423,8 @@
         // Hide user info
         function hideUserInfo() {
             document.getElementById('user-info').style.display = 'none';
+            // Clear session data
+            document.getElementById('session-id').textContent = '-';
         }
 
         // Show loading state

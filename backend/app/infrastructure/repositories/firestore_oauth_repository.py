@@ -51,10 +51,17 @@ class FirestoreOAuthRepository(OAuthRepository):
         """Convert Firestore document to OAuth session entity"""
         # Reconstruct token
         token_data = doc_data["token"]
+        expires_at = token_data["expires_at"]
+        if isinstance(expires_at, str):
+            expires_at_dt = datetime.fromisoformat(expires_at)
+        else:
+            # Handle Firestore timestamp
+            expires_at_dt = expires_at
+            
         token = OAuthToken(
             access_token=token_data["access_token"],
             refresh_token=token_data.get("refresh_token"),
-            expires_at=datetime.fromisoformat(token_data["expires_at"]),
+            expires_at=expires_at_dt,
             scope=token_data["scope"],
             token_type=token_data.get("token_type", "Bearer")
         )
@@ -83,9 +90,19 @@ class FirestoreOAuthRepository(OAuthRepository):
         # Set entity ID and timestamps
         session.id = doc_id
         if doc_data.get("created_at"):
-            session.created_at = datetime.fromisoformat(doc_data["created_at"])
+            created_at = doc_data["created_at"]
+            if isinstance(created_at, str):
+                session.created_at = datetime.fromisoformat(created_at)
+            else:
+                # Handle Firestore timestamp
+                session.created_at = created_at
         if doc_data.get("updated_at"):
-            session.updated_at = datetime.fromisoformat(doc_data["updated_at"])
+            updated_at = doc_data["updated_at"]
+            if isinstance(updated_at, str):
+                session.updated_at = datetime.fromisoformat(updated_at)
+            else:
+                # Handle Firestore timestamp
+                session.updated_at = updated_at
         
         return session
     
