@@ -8,8 +8,9 @@ FastAPI application following clean architecture principles with:
 - Separation of concerns
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
 
 # Infrastructure
@@ -58,6 +59,12 @@ async def lifespan(app: FastAPI):
 
 # Get application settings
 settings = get_settings()
+
+# Security scheme for Bearer token authentication
+security_scheme = HTTPBearer(
+    scheme_name="Bearer",
+    description="Enter your session ID as a Bearer token. This is the session ID you receive after OAuth authentication."
+)
 
 # OpenAPI tags metadata for better organization
 tags_metadata = [

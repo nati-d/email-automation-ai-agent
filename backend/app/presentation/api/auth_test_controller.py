@@ -5,6 +5,7 @@ Test controller to demonstrate authentication middleware usage.
 """
 
 from fastapi import APIRouter, Depends
+from fastapi.security import HTTPBearer
 from typing import Optional
 
 # Application layer
@@ -13,13 +14,17 @@ from ...application.dto.user_dto import UserDTO
 # Middleware
 from ..middleware.auth_middleware import get_current_user, get_optional_current_user
 
+# Security scheme
+security = HTTPBearer()
+
 
 router = APIRouter()
 
 
 @router.get("/auth-test/protected",
            summary="Protected Endpoint",
-           description="Test endpoint that requires authentication.")
+           description="Test endpoint that requires authentication.",
+           dependencies=[Depends(security)])
 async def protected_endpoint(
     current_user: UserDTO = Depends(get_current_user)
 ) -> dict:
@@ -74,7 +79,8 @@ async def optional_auth_endpoint(
 
 @router.get("/auth-test/user-info",
            summary="Get User Info",
-           description="Get current user information from session.")
+           description="Get current user information from session.",
+           dependencies=[Depends(security)])
 async def get_user_info(
     current_user: UserDTO = Depends(get_current_user)
 ) -> dict:

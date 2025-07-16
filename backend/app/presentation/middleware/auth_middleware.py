@@ -26,8 +26,8 @@ def get_oauth_user_info_use_case(
 
 
 async def get_current_user(
-    session_id: Optional[str] = Header(None, alias="X-Session-ID"),
-    session_id_query: Optional[str] = Query(None, alias="session_id"),
+    authorization: Optional[str] = Header(None),
+    session_id_query: Optional[str] = Query(None, alias="session_id"),  # Keep for backward compatibility
     use_case: GetOAuthUserInfoUseCase = Depends(get_oauth_user_info_use_case)
 ) -> UserDTO:
     """
@@ -50,12 +50,24 @@ async def get_current_user(
     Raises:
         HTTPException: 401 if no valid session found, 500 for other errors
     """
-    # Get session ID from header or query parameter
-    actual_session_id = session_id or session_id_query
+    # Extract session ID from Authorization header (Bearer token) or query parameter
+    actual_session_id = None
     
-    print(f"🔐 Auth Middleware - Session ID from header: {session_id}")
-    print(f"🔐 Auth Middleware - Session ID from query: {session_id_query}")
-    print(f"🔐 Auth Middleware - Actual session ID: {actual_session_id}")
+    if authorization:
+        # Check if it's a Bearer token
+        if authorization.startswith("Bearer "):
+            actual_session_id = authorization[7:]  # Remove "Bearer " prefix
+            print(f"🔐 Auth Middleware - Session ID from Bearer token: {actual_session_id[:10]}...")
+        else:
+            # Treat as plain session ID for backward compatibility
+            actual_session_id = authorization
+            print(f"🔐 Auth Middleware - Session ID from Authorization header: {actual_session_id[:10]}...")
+    
+    if not actual_session_id and session_id_query:
+        actual_session_id = session_id_query
+        print(f"🔐 Auth Middleware - Session ID from query parameter: {actual_session_id[:10]}...")
+    
+    print(f"🔐 Auth Middleware - Final session ID: {actual_session_id[:10] if actual_session_id else 'None'}...")
     
     if not actual_session_id:
         print("❌ Auth Middleware - No session ID provided")
@@ -63,7 +75,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "error": "MISSING_SESSION_ID",
-                "message": "Session ID is required. Provide it in X-Session-ID header or session_id query parameter."
+                "message": "Session ID is required. Provide it as Bearer token in Authorization header or session_id query parameter."
             }
         )
     
@@ -122,8 +134,8 @@ async def get_current_user(
 
 
 async def get_optional_current_user(
-    session_id: Optional[str] = Header(None, alias="X-Session-ID"),
-    session_id_query: Optional[str] = Query(None, alias="session_id"),
+    authorization: Optional[str] = Header(None),
+    session_id_query: Optional[str] = Query(None, alias="session_id"),  # Keep for backward compatibility
     use_case: GetOAuthUserInfoUseCase = Depends(get_oauth_user_info_use_case)
 ) -> Optional[UserDTO]:
     """
@@ -141,8 +153,19 @@ async def get_optional_current_user(
     Returns:
         Optional[UserDTO]: The authenticated user's data or None if not authenticated
     """
-    # Get session ID from header or query parameter
-    actual_session_id = session_id or session_id_query
+    # Extract session ID from Authorization header (Bearer token) or query parameter
+    actual_session_id = None
+    
+    if authorization:
+        # Check if it's a Bearer token
+        if authorization.startswith("Bearer "):
+            actual_session_id = authorization[7:]  # Remove "Bearer " prefix
+        else:
+            # Treat as plain session ID for backward compatibility
+            actual_session_id = authorization
+    
+    if not actual_session_id and session_id_query:
+        actual_session_id = session_id_query
     
     if not actual_session_id:
         return None

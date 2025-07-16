@@ -56,19 +56,19 @@ async def public_endpoint(
 
 The middleware can extract the session ID from two sources:
 
-1. **Header**: `X-Session-ID` header
-2. **Query Parameter**: `session_id` query parameter
+1. **Authorization Header**: `Authorization: Bearer <session_id>` (recommended)
+2. **Query Parameter**: `session_id` query parameter (for backward compatibility)
 
 ### Examples
 
-#### Using Header
+#### Using Bearer Token (Recommended)
 ```bash
-curl -H "X-Session-ID: abc123" http://localhost:8000/api/emails/my-emails
+curl -H "Authorization: Bearer abc123" http://localhost:8000/api/emails
 ```
 
-#### Using Query Parameter
+#### Using Query Parameter (Backward Compatibility)
 ```bash
-curl http://localhost:8000/api/emails/my-emails?session_id=abc123
+curl http://localhost:8000/api/emails?session_id=abc123
 ```
 
 ## Error Handling
@@ -118,12 +118,12 @@ To test the middleware:
 Example test flow:
 ```bash
 # 1. Get session ID from OAuth callback
-# 2. Test protected endpoint
-curl -H "X-Session-ID: YOUR_SESSION_ID" http://localhost:8000/api/emails/my-emails
+# 2. Test protected endpoint (using Bearer token)
+curl -H "Authorization: Bearer YOUR_SESSION_ID" http://localhost:8000/api/emails
 
 # 3. Test public endpoint (works without session)
 curl http://localhost:8000/api/emails/public
 
 # 4. Test public endpoint with session (personalized)
-curl -H "X-Session-ID: YOUR_SESSION_ID" http://localhost:8000/api/emails/public
+curl -H "Authorization: Bearer YOUR_SESSION_ID" http://localhost:8000/api/emails/public
 ``` 

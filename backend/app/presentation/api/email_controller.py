@@ -5,6 +5,7 @@ Only authenticated users can access their emails via GET /emails.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPBearer
 from typing import Optional
 
 # Application layer
@@ -23,6 +24,9 @@ from ..models.email_models import EmailListResponse
 
 # Middleware
 from ..middleware.auth_middleware import get_current_user
+
+# Security scheme
+security = HTTPBearer()
 
 router = APIRouter()
 
@@ -64,7 +68,8 @@ def _handle_domain_exception(e: DomainException) -> HTTPException:
 @router.get("/emails",
            response_model=EmailListResponse,
            summary="Get My Emails",
-           description="Get emails for the currently authenticated user.")
+           description="Get emails for the currently authenticated user.",
+           dependencies=[Depends(security)])
 async def get_my_emails(
     current_user: UserDTO = Depends(get_current_user),
     limit: int = 50,
