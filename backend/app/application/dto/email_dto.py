@@ -82,4 +82,19 @@ class EmailListDTO:
     @property
     def has_previous(self) -> bool:
         """Check if there are previous pages"""
-        return self.page > 1 
+        return self.page > 1
+
+
+@dataclass
+class SendEmailDTO:
+    """Send email data transfer object"""
+    
+    recipients: List[str]
+    subject: str
+    body: str
+    html_body: Optional[str] = None
+    metadata: Dict[str, Any] = None
+    
+    def __post_init__(self):
+        if self.metadata is None:
+            self.metadata = {} 

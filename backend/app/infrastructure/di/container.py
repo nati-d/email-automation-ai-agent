@@ -25,7 +25,7 @@ from ...domain.repositories.oauth_repository import OAuthRepository
 # Application
 from ...application.use_cases.email_use_cases import (
     CreateEmailUseCase, GetEmailUseCase, UpdateEmailUseCase,
-    DeleteEmailUseCase, SendEmailUseCase, ScheduleEmailUseCase,
+    DeleteEmailUseCase, SendEmailUseCase, SendNewEmailUseCase, ScheduleEmailUseCase,
     ListEmailsUseCase, FetchInitialEmailsUseCase
 )
 from ...application.use_cases.user_use_cases import (
@@ -57,6 +57,7 @@ class Container:
         self._update_email_use_case: Optional[UpdateEmailUseCase] = None
         self._delete_email_use_case: Optional[DeleteEmailUseCase] = None
         self._send_email_use_case: Optional[SendEmailUseCase] = None
+        self._send_new_email_use_case: Optional[SendNewEmailUseCase] = None
         self._schedule_email_use_case: Optional[ScheduleEmailUseCase] = None
         self._list_emails_use_case: Optional[ListEmailsUseCase] = None
         self._fetch_initial_emails_use_case: Optional[FetchInitialEmailsUseCase] = None
@@ -162,6 +163,23 @@ class Container:
         if self._send_email_use_case is None:
             self._send_email_use_case = SendEmailUseCase(self.email_repository())
         return self._send_email_use_case
+    
+    def send_new_email_use_case(self) -> SendNewEmailUseCase:
+        """Get send new email use case"""
+        if self._send_new_email_use_case is None:
+            print(f"🔍 DEBUG: Creating SendNewEmailUseCase")
+            email_repo = self.email_repository()
+            email_svc = self.email_service()
+            print(f"   📧 Email repository type: {type(email_repo).__name__}")
+            print(f"   📧 Email service type: {type(email_svc).__name__}")
+            print(f"   📧 Email service configured: {email_svc.is_configured()}")
+            
+            self._send_new_email_use_case = SendNewEmailUseCase(
+                email_repository=email_repo,
+                email_service=email_svc
+            )
+            print(f"   ✅ SendNewEmailUseCase created successfully")
+        return self._send_new_email_use_case
     
     def schedule_email_use_case(self) -> ScheduleEmailUseCase:
         """Get schedule email use case"""

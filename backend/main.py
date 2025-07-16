@@ -8,8 +8,9 @@ FastAPI application following clean architecture principles with:
 - Separation of concerns
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
 
 # Infrastructure
@@ -22,6 +23,7 @@ from app.presentation.api.user_controller import router as user_router
 from app.presentation.api.health_controller import router as health_router
 from app.presentation.api.oauth_controller import router as oauth_router
 from app.presentation.api.test_controller import router as test_router
+from app.presentation.api.auth_test_controller import router as auth_test_router
 
 # Keep the old routers for compatibility (temporary)
 from app.routers import firestore
@@ -58,6 +60,12 @@ async def lifespan(app: FastAPI):
 # Get application settings
 settings = get_settings()
 
+# Security scheme for Bearer token authentication
+security_scheme = HTTPBearer(
+    scheme_name="Bearer",
+    description="Enter your session ID as a Bearer token. This is the session ID you receive after OAuth authentication."
+)
+
 # OpenAPI tags metadata for better organization
 tags_metadata = [
     {
@@ -87,6 +95,10 @@ tags_metadata = [
     {
         "name": "test",
         "description": "Test and debugging endpoints for development.",
+    },
+    {
+        "name": "auth-test",
+        "description": "Authentication middleware test endpoints for development.",
     },
 ]
 
@@ -127,6 +139,7 @@ app.include_router(email_router, prefix=settings.api_prefix, tags=["emails"])
 app.include_router(user_router, prefix=settings.api_prefix, tags=["users"])
 app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(test_router, prefix=settings.api_prefix, tags=["test"])
+app.include_router(auth_test_router, prefix=settings.api_prefix, tags=["auth-test"])
 
 # Include legacy routers for backward compatibility
 app.include_router(firestore.router, prefix=settings.api_prefix, tags=["firestore-legacy"])

@@ -147,6 +147,97 @@ class SendEmailUseCase(EmailUseCaseBase):
             raise
 
 
+class SendNewEmailUseCase(EmailUseCaseBase):
+    """Use case for creating and sending a new email"""
+    
+    def __init__(self, email_repository: EmailRepository, email_service=None):
+        super().__init__(email_repository)
+        self.email_service = email_service
+    
+    async def execute(self, sender_email: str, recipients: List[str], subject: str, body: str, html_body: Optional[str] = None) -> EmailDTO:
+        """Create and send a new email"""
+        
+        # Create email entity
+        sender = EmailAddress.create(sender_email)
+        recipient_addresses = [EmailAddress.create(recipient) for recipient in recipients]
+        
+        email = Email(
+            sender=sender,
+            recipients=recipient_addresses,
+            subject=subject,
+            body=body,
+            html_body=html_body
+        )
+        
+        # Save email first
+        saved_email = await self.email_repository.save(email)
+        
+        # Mark as sending
+        saved_email.mark_as_sending()
+        await self.email_repository.update(saved_email)
+        
+        try:
+            print(f"🔍 DEBUG: SendNewEmailUseCase - About to send email")
+            print(f"   📧 Email details:")
+            print(f"      sender: {sender_email}")
+            print(f"      recipients: {recipients}")
+            print(f"      subject: {subject}")
+            print(f"      body length: {len(body)} chars")
+            print(f"      html_body: {'provided' if html_body else 'None'}")
+            
+            # Send email using email service if available
+            if self.email_service:
+                print(f"🔍 DEBUG: Email service is available, calling send_email()")
+                print(f"   🔧 Email service type: {type(self.email_service).__name__}")
+                
+                try:
+                    success = await self.email_service.send_email(
+                        sender=sender_email,
+                        recipients=recipients,
+                        subject=subject,
+                        body=body,
+                        html_body=html_body
+                    )
+                    print(f"🔍 DEBUG: Email service send_email() returned: {success}")
+                    
+                    if not success:
+                        print(f"🔍 DEBUG: Email service returned False, marking as failed")
+                        # Email service failed to send
+                        saved_email.mark_as_failed("Email service failed to send email")
+                        await self.email_repository.update(saved_email)
+                        raise DomainValidationError("Failed to send email: Email service returned failure")
+                    else:
+                        print(f"🔍 DEBUG: Email service returned True, proceeding to mark as sent")
+                        
+                except Exception as email_service_error:
+                    print(f"🔍 DEBUG: Email service threw exception: {email_service_error}")
+                    print(f"🔍 DEBUG: Exception type: {type(email_service_error).__name__}")
+                    import traceback
+                    print(f"🔍 DEBUG: Email service exception traceback: {traceback.format_exc()}")
+                    raise email_service_error
+                    
+            else:
+                print(f"🔍 DEBUG: No email service available")
+                # No email service available
+                saved_email.mark_as_failed("No email service configured")
+                await self.email_repository.update(saved_email)
+                raise DomainValidationError("Failed to send email: No email service configured")
+            
+            # Mark as sent
+            saved_email.mark_as_sent()
+            updated_email = await self.email_repository.update(saved_email)
+            return self._entity_to_dto(updated_email)
+        
+        except DomainValidationError:
+            # Re-raise domain validation errors
+            raise
+        except Exception as e:
+            # Mark as failed
+            saved_email.mark_as_failed(str(e))
+            await self.email_repository.update(saved_email)
+            raise DomainValidationError(f"Failed to send email: {str(e)}")
+
+
 class ScheduleEmailUseCase(EmailUseCaseBase):
     """Use case for scheduling emails"""
     
@@ -166,14 +257,18 @@ class ListEmailsUseCase(EmailUseCaseBase):
     
     async def execute(
         self, 
-        sender: Optional[str] = None, 
+        sender: Optional[str] = None,
+        recipient: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50
     ) -> EmailListDTO:
         """List emails with optional filters"""
         emails = []
         
-        if sender:
+        if recipient:
+            recipient_email = EmailAddress.create(recipient)
+            emails = await self.email_repository.find_by_recipient(recipient_email, limit)
+        elif sender:
             sender_email = EmailAddress.create(sender)
             emails = await self.email_repository.find_by_sender(sender_email, limit)
         elif status:

@@ -98,6 +98,16 @@ class FirestoreEmailRepository(EmailRepository):
         docs = query.stream()
         return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
     
+    async def find_by_recipient(self, recipient: EmailAddress, limit: int = 50) -> List[Email]:
+        """Find emails by recipient"""
+        query = self.db.collection(self.collection_name)\
+            .where("recipients", "array_contains", str(recipient))\
+            .order_by("created_at", direction=firestore.Query.DESCENDING)\
+            .limit(limit)
+        
+        docs = query.stream()
+        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+    
     async def find_by_status(self, status: EmailStatus, limit: int = 50) -> List[Email]:
         """Find emails by status"""
         query = self.db.collection(self.collection_name)\

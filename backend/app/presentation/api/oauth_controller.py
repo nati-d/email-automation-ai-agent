@@ -6,9 +6,11 @@ Clean architecture implementation of OAuth API endpoints.
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer
 from typing import Optional
 
 # Application layer
+from ...application.dto.user_dto import UserDTO
 from ...application.use_cases.oauth_use_cases import (
     InitiateOAuthLoginUseCase,
     ProcessOAuthCallbackUseCase,
@@ -33,8 +35,15 @@ from ..models.oauth_models import (
     OAuthUserInfoResponse,
     OAuthLogoutResponse,
     OAuthErrorResponse,
-    OAuthUserResponse
+    OAuthUserResponse,
+    OAuthSessionInfo
 )
+
+# Middleware
+from ..middleware.auth_middleware import get_current_user, get_current_user_with_session_id
+
+# Security scheme
+security = HTTPBearer()
 
 
 router = APIRouter()
@@ -232,9 +241,10 @@ async def google_oauth_callback(
 @router.post("/auth/refresh",
             response_model=OAuthTokenRefreshResponse,
             summary="Refresh OAuth Token",
-            description="Refresh an expired OAuth access token using the refresh token.")
+            description="Refresh an expired OAuth access token using the refresh token.",
+            dependencies=[Depends(security)])
 async def refresh_oauth_token(
-    session_id: str,
+    user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
     use_case: RefreshOAuthTokenUseCase = Depends(get_refresh_oauth_token_use_case)
 ) -> OAuthTokenRefreshResponse:
     """
@@ -247,11 +257,18 @@ async def refresh_oauth_token(
     Use this endpoint when your access token expires to get a new one without
     requiring the user to re-authenticate.
     
-    ### Parameters
+    ### Authentication
     
-    - **session_id**: The OAuth session ID returned during login
+    - **Authorization**: Bearer token (session ID) required in Authorization header
+    - **Example**: `Authorization: Bearer your_session_id_here`
+    
+    ### Response
+    
+    Returns a new access token with updated expiration time.
     """
     try:
+        current_user, session_id = user_and_session
+        
         result = await use_case.execute(session_id)
         
         return OAuthTokenRefreshResponse(
@@ -272,9 +289,10 @@ async def refresh_oauth_token(
 @router.get("/auth/me",
            response_model=OAuthUserInfoResponse,
            summary="Get Current User Info",
-           description="Get current authenticated user information from OAuth session.")
+           description="Get current authenticated user information from OAuth session.",
+           dependencies=[Depends(security)])
 async def get_current_user_info(
-    session_id: str,
+    user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
     use_case: GetOAuthUserInfoUseCase = Depends(get_oauth_user_info_use_case)
 ) -> OAuthUserInfoResponse:
     """
@@ -285,32 +303,49 @@ async def get_current_user_info(
     ### Usage
     
     Use this endpoint to get user details and session information for the
-    authenticated user.
+    authenticated user. Requires a valid Bearer token in the Authorization header.
     
-    ### Parameters
+    ### Authentication
     
-    - **session_id**: The OAuth session ID returned during login
+    - **Authorization**: Bearer token (session ID) required in Authorization header
+    - **Example**: `Authorization: Bearer your_session_id_here`
+    
+    ### Response
+    
+    Returns user information and session details for the authenticated user.
     """
     try:
-        print(f"🔍 Getting user info for session_id: {session_id}")
+        current_user, session_id = user_and_session
+        
+        # Get complete user and session info from use case
         result = await use_case.execute(session_id)
         print(f"✅ Use case executed successfully, result keys: {result.keys()}")
         
         user_data = result["user"]
         session_info = result["session_info"]
         
-        print(f"👤 User data: {user_data}")
-        print(f"📋 Session info: {session_info}")
+        # Convert user data to OAuthUserResponse format
+        user_response = OAuthUserResponse(
+            id=user_data.id,
+            email=user_data.email,
+            name=user_data.name,
+            role=user_data.role,
+            is_active=user_data.is_active,
+            last_login=user_data.last_login,
+            created_at=user_data.created_at,
+            updated_at=user_data.updated_at
+        )
         
-        # Convert UserDTO to dict for response model
-        if hasattr(user_data, '__dict__'):
-            user_dict = user_data.__dict__
-        else:
-            user_dict = user_data
-            
+        # Create OAuthSessionInfo from session_info
+        oauth_session_info = OAuthSessionInfo(
+            provider=session_info["provider"],
+            session_active=session_info["session_active"],
+            token_expires_in=session_info["token_expires_in"]
+        )
+        
         return OAuthUserInfoResponse(
-            user=OAuthUserResponse(**user_dict),
-            session_info=session_info
+            user=user_response,
+            session_info=oauth_session_info
         )
         
     except DomainException as e:
@@ -330,9 +365,10 @@ async def get_current_user_info(
 @router.post("/auth/logout",
             response_model=OAuthLogoutResponse,
             summary="OAuth Logout",
-            description="Logout user and revoke OAuth tokens.")
+            description="Logout user and revoke OAuth tokens.",
+            dependencies=[Depends(security)])
 async def oauth_logout(
-    session_id: str,
+    user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
     use_case: LogoutOAuthUseCase = Depends(get_logout_oauth_use_case)
 ) -> OAuthLogoutResponse:
     """
@@ -347,11 +383,20 @@ async def oauth_logout(
     3. Deactivate local OAuth session
     4. Return logout status
     
-    ### Parameters
+    ### Authentication
     
-    - **session_id**: The OAuth session ID to logout
+    - **Authorization**: Bearer token (session ID) required in Authorization header
+    - **Example**: `Authorization: Bearer your_session_id_here`
+    
+    ### Usage
+    
+    This endpoint will logout the authenticated user and revoke their OAuth tokens.
+    The session ID is automatically extracted from the Bearer token.
     """
     try:
+        current_user, session_id = user_and_session
+        
+        # Execute logout use case with session ID
         result = await use_case.execute(session_id)
         
         return OAuthLogoutResponse(
