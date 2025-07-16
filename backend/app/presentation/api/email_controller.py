@@ -15,7 +15,8 @@ from ...application.use_cases.email_use_cases import (
     ListEmailsUseCase, 
     SendNewEmailUseCase,
     SummarizeEmailUseCase,
-    SummarizeMultipleEmailsUseCase
+    SummarizeMultipleEmailsUseCase,
+    GetEmailUseCase
 )
 
 # Domain exceptions
@@ -50,6 +51,10 @@ def get_summarize_email_use_case(container: Container = Depends(get_container)) 
 
 def get_summarize_multiple_emails_use_case(container: Container = Depends(get_container)) -> SummarizeMultipleEmailsUseCase:
     return container.summarize_multiple_emails_use_case()
+
+
+def get_get_email_use_case(container: Container = Depends(get_container)) -> GetEmailUseCase:
+    return container.get_email_use_case()
 
 
 def _dto_to_response(dto: EmailDTO) -> dict:
@@ -398,6 +403,38 @@ async def get_emails_by_category(
             has_next=dto.has_next,
             has_previous=dto.has_previous
         )
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.get("/emails/{email_id}",
+           response_model=dict,
+           summary="Get Email by ID",
+           description="Get a single email by its ID for the authenticated user.",
+           dependencies=[Depends(security)])
+async def get_email_by_id(
+    email_id: str,
+    current_user: UserDTO = Depends(get_current_user),
+    use_case: GetEmailUseCase = Depends(get_get_email_use_case)
+) -> dict:
+    """
+    Get a single email by its ID. Only accessible if the user is a sender or recipient.
+    """
+    try:
+        email_dto = await use_case.execute(email_id)
+        # Only allow access if the user is a sender or recipient
+        if (current_user.email != email_dto.sender and
+            current_user.email not in email_dto.recipients):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"error": "FORBIDDEN", "message": "Access denied to this email"}
+            )
+        return _dto_to_response(email_dto)
     except DomainException as e:
         raise _handle_domain_exception(e)
     except Exception as e:
