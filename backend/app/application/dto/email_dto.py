@@ -33,6 +33,9 @@ class EmailDTO:
     sentiment: Optional[str] = None
     key_topics: List[str] = None
     summarized_at: Optional[datetime] = None
+    # Email categorization
+    email_type: str = "inbox"
+    categorized_at: Optional[datetime] = None
     
     def __post_init__(self):
         if self.metadata is None:

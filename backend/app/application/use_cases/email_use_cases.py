@@ -45,7 +45,10 @@ class EmailUseCaseBase:
             main_concept=email.main_concept,
             sentiment=email.sentiment,
             key_topics=email.key_topics,
-            summarized_at=email.summarized_at
+            summarized_at=email.summarized_at,
+            # Email categorization
+            email_type=email.email_type.value,
+            categorized_at=email.categorized_at
         )
     
     def _dto_to_entity(self, dto: CreateEmailDTO) -> Email:
@@ -345,16 +348,16 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                     print(f"✅ Stored email with ID: {saved_email.id}")
                     stored_count += 1
                     
-                    # Summarize email if LLM service is available
+                    # Process email with AI (summarization and categorization) if LLM service is available
                     if self.llm_service:
                         try:
-                            print(f"🔄 Summarizing email {saved_email.id}...")
+                            print(f"🔄 Processing email {saved_email.id} with AI...")
                             print(f"🔧 DEBUG: LLM service type: {type(self.llm_service).__name__}")
                             print(f"🔧 DEBUG: Email subject: {saved_email.subject}")
                             print(f"🔧 DEBUG: Email body length: {len(saved_email.body)} chars")
                             print(f"🔧 DEBUG: Has HTML body: {saved_email.html_body is not None}")
                             
-                            # Prepare content for summarization
+                            # Prepare content for AI processing
                             email_content = saved_email.body
                             if saved_email.html_body:
                                 import re
@@ -367,9 +370,25 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                             recipient = str(saved_email.recipients[0]) if saved_email.recipients else ""
                             print(f"🔧 DEBUG: Sender: {sender}")
                             print(f"🔧 DEBUG: Recipient: {recipient}")
-                            print(f"🔧 DEBUG: Content to summarize: {email_content[:200]}...")
+                            print(f"🔧 DEBUG: Content to process: {email_content[:200]}...")
                             
-                            # Call LLM service for summarization
+                            # Step 1: Categorize email
+                            print(f"🔧 DEBUG: Calling LLM service.categorize_email...")
+                            category = self.llm_service.categorize_email(
+                                email_content=email_content,
+                                email_subject=saved_email.subject,
+                                sender=sender,
+                                recipient=recipient
+                            )
+                            print(f"🔧 DEBUG: Email categorized as: {category}")
+                            
+                            # Set email type based on categorization
+                            from ...domain.entities.email import EmailType
+                            email_type = EmailType.TASKS if category == 'tasks' else EmailType.INBOX
+                            saved_email.set_email_type(email_type)
+                            print(f"🔧 DEBUG: Email type set to: {email_type.value}")
+                            
+                            # Step 2: Summarize email
                             print(f"🔧 DEBUG: Calling LLM service.summarize_email...")
                             summarization_result = self.llm_service.summarize_email(
                                 email_content=email_content,
@@ -404,21 +423,21 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                             )
                             print(f"🔧 DEBUG: Summarization set successfully")
                             
-                            # Save updated email with summarization
-                            print(f"🔧 DEBUG: Saving email with summarization...")
+                            # Save updated email with both categorization and summarization
+                            print(f"🔧 DEBUG: Saving email with AI processing...")
                             await self.email_repository.update(saved_email)
-                            print(f"✅ Email summarized successfully")
+                            print(f"✅ Email processed successfully (Type: {category}, Summarized: Yes)")
                             summarized_count += 1
                             
-                        except Exception as summary_error:
-                            print(f"⚠️ Failed to summarize email {saved_email.id}: {str(summary_error)}")
-                            print(f"🔧 DEBUG: Summary error type: {type(summary_error).__name__}")
+                        except Exception as ai_error:
+                            print(f"⚠️ Failed to process email {saved_email.id} with AI: {str(ai_error)}")
+                            print(f"🔧 DEBUG: AI processing error type: {type(ai_error).__name__}")
                             import traceback
-                            print(f"🔧 DEBUG: Summary error traceback: {traceback.format_exc()}")
-                            # Continue with next email even if summarization fails
+                            print(f"🔧 DEBUG: AI processing error traceback: {traceback.format_exc()}")
+                            # Continue with next email even if AI processing fails
                             continue
                     else:
-                        print(f"⚠️ LLM service is None - skipping summarization for email {saved_email.id}")
+                        print(f"⚠️ LLM service is None - skipping AI processing for email {saved_email.id}")
                     
                 except Exception as e:
                     print(f"⚠️ Failed to store email {email.subject}: {str(e)}")

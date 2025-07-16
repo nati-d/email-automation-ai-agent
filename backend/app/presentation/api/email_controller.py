@@ -71,7 +71,10 @@ def _dto_to_response(dto: EmailDTO) -> dict:
         "main_concept": dto.main_concept,
         "sentiment": dto.sentiment,
         "key_topics": dto.key_topics,
-        "summarized_at": dto.summarized_at.isoformat() if dto.summarized_at else None
+        "summarized_at": dto.summarized_at.isoformat() if dto.summarized_at else None,
+        # Email categorization
+        "email_type": dto.email_type,
+        "categorized_at": dto.categorized_at.isoformat() if dto.categorized_at else None
     }
 
 
@@ -271,6 +274,86 @@ async def summarize_multiple_emails(
             "errors": result.get("errors", [])
         }
         
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.get("/emails/tasks",
+           response_model=EmailListResponse,
+           summary="Get Task Emails",
+           description="Get emails categorized as tasks for the currently authenticated user.",
+           dependencies=[Depends(security)])
+async def get_task_emails(
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = 50,
+    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+) -> EmailListResponse:
+    """
+    Get emails categorized as tasks for the currently authenticated user.
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        # For now, we'll filter by email_type in the response
+        # In the future, we can add a specific use case for task emails
+        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        
+        # Filter for task emails
+        task_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "tasks"]
+        email_responses = [_dto_to_response(email_dto) for email_dto in task_emails]
+        
+        return EmailListResponse(
+            emails=email_responses,
+            total_count=len(task_emails),
+            page=dto.page,
+            page_size=dto.page_size,
+            has_next=dto.has_next,
+            has_previous=dto.has_previous
+        )
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.get("/emails/inbox",
+           response_model=EmailListResponse,
+           summary="Get Inbox Emails",
+           description="Get emails categorized as inbox for the currently authenticated user.",
+           dependencies=[Depends(security)])
+async def get_inbox_emails(
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = 50,
+    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+) -> EmailListResponse:
+    """
+    Get emails categorized as inbox for the currently authenticated user.
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        # For now, we'll filter by email_type in the response
+        # In the future, we can add a specific use case for inbox emails
+        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        
+        # Filter for inbox emails
+        inbox_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "inbox"]
+        email_responses = [_dto_to_response(email_dto) for email_dto in inbox_emails]
+        
+        return EmailListResponse(
+            emails=email_responses,
+            total_count=len(inbox_emails),
+            page=dto.page,
+            page_size=dto.page_size,
+            has_next=dto.has_next,
+            has_previous=dto.has_previous
+        )
     except DomainException as e:
         raise _handle_domain_exception(e)
     except Exception as e:

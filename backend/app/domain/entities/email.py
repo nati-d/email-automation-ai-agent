@@ -24,6 +24,12 @@ class EmailStatus(Enum):
     CANCELLED = "cancelled"
 
 
+class EmailType(Enum):
+    """Email type enumeration"""
+    INBOX = "inbox"
+    TASKS = "tasks"
+
+
 @dataclass
 class Email(BaseEntity):
     """Email entity with business logic"""
@@ -43,6 +49,9 @@ class Email(BaseEntity):
     sentiment: Optional[str] = None
     key_topics: List[str] = field(default_factory=list)
     summarized_at: Optional[datetime] = None
+    # Email categorization
+    email_type: EmailType = EmailType.INBOX
+    categorized_at: Optional[datetime] = None
     
     def __post_init__(self):
         """Initialize Email entity and validate"""
@@ -205,4 +214,30 @@ class Email(BaseEntity):
             "sentiment": self.sentiment,
             "key_topics": self.key_topics,
             "summarized_at": self.summarized_at.isoformat() if self.summarized_at else None
+        }
+    
+    def set_email_type(self, email_type: EmailType) -> None:
+        """Set email type (Inbox or Tasks)"""
+        if not isinstance(email_type, EmailType):
+            raise DomainValidationError(f"Invalid email type: {email_type}")
+        
+        self.email_type = email_type
+        self.categorized_at = datetime.utcnow()
+        self.mark_updated()
+    
+    def is_task_email(self) -> bool:
+        """Check if email is categorized as a task"""
+        return self.email_type == EmailType.TASKS
+    
+    def is_inbox_email(self) -> bool:
+        """Check if email is categorized as inbox"""
+        return self.email_type == EmailType.INBOX
+    
+    def get_categorization_data(self) -> Dict[str, Any]:
+        """Get categorization data as dictionary"""
+        return {
+            "email_type": self.email_type.value,
+            "categorized_at": self.categorized_at.isoformat() if self.categorized_at else None,
+            "is_task": self.is_task_email(),
+            "is_inbox": self.is_inbox_email()
         } 

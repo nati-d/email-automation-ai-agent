@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 from firebase_admin import firestore
 
-from ...domain.entities.email import Email, EmailStatus
+from ...domain.entities.email import Email, EmailStatus, EmailType
 from ...domain.value_objects.email_address import EmailAddress
 from ...domain.repositories.email_repository import EmailRepository
 from ...domain.exceptions.domain_exceptions import EntityNotFoundError
@@ -40,7 +40,10 @@ class FirestoreEmailRepository(EmailRepository):
             "main_concept": email.main_concept,
             "sentiment": email.sentiment,
             "key_topics": email.key_topics,
-            "summarized_at": email.summarized_at
+            "summarized_at": email.summarized_at,
+            # Email categorization
+            "email_type": email.email_type.value,
+            "categorized_at": email.categorized_at
         }
     
     def _doc_to_entity(self, doc_id: str, doc_data: dict) -> Email:
@@ -63,7 +66,10 @@ class FirestoreEmailRepository(EmailRepository):
             main_concept=doc_data.get("main_concept"),
             sentiment=doc_data.get("sentiment"),
             key_topics=doc_data.get("key_topics", []),
-            summarized_at=doc_data.get("summarized_at")
+            summarized_at=doc_data.get("summarized_at"),
+            # Email categorization
+            email_type=EmailType(doc_data.get("email_type", "inbox")),
+            categorized_at=doc_data.get("categorized_at")
         )
         
         # Set entity ID and timestamps
@@ -157,6 +163,8 @@ class FirestoreEmailRepository(EmailRepository):
         print(f"🔧 DEBUG: [FirestoreEmailRepository] Main concept in doc_data: {doc_data.get('main_concept', 'NOT_FOUND')}")
         print(f"🔧 DEBUG: [FirestoreEmailRepository] Sentiment in doc_data: {doc_data.get('sentiment', 'NOT_FOUND')}")
         print(f"🔧 DEBUG: [FirestoreEmailRepository] Key topics in doc_data: {doc_data.get('key_topics', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Email type in doc_data: {doc_data.get('email_type', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Categorized at in doc_data: {doc_data.get('categorized_at', 'NOT_FOUND')}")
         
         doc_ref = self.db.collection(self.collection_name).document(email.id)
         doc_ref.update(doc_data)

@@ -494,6 +494,120 @@ class LLMService:
             print(f"[LLMService] extract_email_concepts failed: {e}")
             return []
 
+    def categorize_email(
+        self,
+        email_content: str,
+        email_subject: str = "",
+        sender: str = "",
+        recipient: str = ""
+    ) -> str:
+        """
+        Categorize email as either 'inbox' or 'tasks' based on content.
+        
+        Args:
+            email_content: The email body content
+            email_subject: The email subject line
+            sender: The sender's email address
+            recipient: The recipient's email address
+            
+        Returns:
+            'tasks' if email contains actionable items, 'inbox' otherwise
+        """
+        print(f"🔧 DEBUG: [LLMService] categorize_email called")
+        print(f"🔧 DEBUG: [LLMService] email_content length: {len(email_content)}")
+        print(f"🔧 DEBUG: [LLMService] email_subject: {email_subject}")
+        
+        system_instruction = (
+            "You are an expert email categorizer. Analyze the email content and determine if it contains "
+            "actionable items, tasks, or requires the recipient to do something. "
+            "You MUST respond with ONLY valid JSON in the exact format specified. "
+            "Do not include any markdown formatting, explanations, or additional text. "
+            "The response must be parseable JSON with this exact structure: "
+            '{"category": "tasks/inbox", "reason": "brief explanation of categorization"}'
+        )
+        
+        # Build context for better analysis
+        context_parts = []
+        if email_subject:
+            context_parts.append(f"Subject: {email_subject}")
+        if sender:
+            context_parts.append(f"From: {sender}")
+        if recipient:
+            context_parts.append(f"To: {recipient}")
+        
+        context = "\n".join(context_parts)
+        print(f"🔧 DEBUG: [LLMService] context: {context}")
+        
+        query = f"Categorize this email as 'tasks' or 'inbox'. Return ONLY valid JSON:\n\n"
+        if context:
+            query += f"Context:\n{context}\n\n"
+        query += f"Content:\n{email_content}\n\n"
+        query += f"Return ONLY this JSON structure:\n"
+        query += f'{{"category": "tasks/inbox", "reason": "brief explanation"}}'
+        
+        print(f"🔧 DEBUG: [LLMService] query length: {len(query)}")
+        print(f"🔧 DEBUG: [LLMService] query preview: {query[:500]}...")
+        
+        try:
+            print(f"🔧 DEBUG: [LLMService] Calling generate_content for categorization...")
+            response = self.generate_content(
+                system_instruction=system_instruction,
+                query=query,
+                response_type="text/plain"
+            )
+            print(f"🔧 DEBUG: [LLMService] generate_content returned: {response[:200]}...")
+            
+            # Parse JSON response
+            print(f"🔧 DEBUG: [LLMService] Parsing JSON response for categorization...")
+            result = json.loads(response)
+            print(f"🔧 DEBUG: [LLMService] Parsed JSON: {result}")
+            
+            category = result.get('category', 'inbox').lower()
+            reason = result.get('reason', 'No reason provided')
+            
+            # Validate category
+            if category not in ['tasks', 'inbox']:
+                print(f"🔧 DEBUG: [LLMService] Invalid category '{category}', defaulting to 'inbox'")
+                category = 'inbox'
+            
+            print(f"🔧 DEBUG: [LLMService] Final category: {category}")
+            print(f"🔧 DEBUG: [LLMService] Reason: {reason}")
+            
+            return category
+            
+        except json.JSONDecodeError as e:
+            print(f"🔧 DEBUG: [LLMService] JSON decode error in categorization: {e}")
+            print(f"🔧 DEBUG: [LLMService] Raw response: {response}")
+            
+            # Try to extract JSON from the response if it contains JSON
+            try:
+                import re
+                # Look for JSON pattern in the response
+                json_pattern = r'\{[^{}]*"category"[^{}]*"reason"[^{}]*\}'
+                json_match = re.search(json_pattern, response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    print(f"🔧 DEBUG: [LLMService] Found JSON pattern: {json_str}")
+                    extracted_result = json.loads(json_str)
+                    category = extracted_result.get('category', 'inbox').lower()
+                    if category not in ['tasks', 'inbox']:
+                        category = 'inbox'
+                    print(f"🔧 DEBUG: [LLMService] Successfully extracted category: {category}")
+                    return category
+            except Exception as extract_error:
+                print(f"🔧 DEBUG: [LLMService] Failed to extract JSON: {extract_error}")
+            
+            # Return fallback
+            print(f"🔧 DEBUG: [LLMService] Returning fallback category: inbox")
+            return 'inbox'
+            
+        except Exception as e:
+            print(f"🔧 DEBUG: [LLMService] categorize_email failed: {e}")
+            print(f"🔧 DEBUG: [LLMService] Error type: {type(e).__name__}")
+            import traceback
+            print(f"🔧 DEBUG: [LLMService] Full traceback: {traceback.format_exc()}")
+            return 'inbox'
+
     # ------------------------------------------------------------------
     # Utility Methods
     # ------------------------------------------------------------------
