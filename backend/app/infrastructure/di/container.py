@@ -17,11 +17,13 @@ from ..external_services.llm_service import LLMService
 from ..repositories.firestore_email_repository import FirestoreEmailRepository
 from ..repositories.firestore_user_repository import FirestoreUserRepository
 from ..repositories.firestore_oauth_repository import FirestoreOAuthRepository
+from ..repositories.firestore_category_repository import FirestoreCategoryRepository
 
 # Domain
 from ...domain.repositories.email_repository import EmailRepository
 from ...domain.repositories.user_repository import UserRepository
 from ...domain.repositories.oauth_repository import OAuthRepository
+from ...domain.repositories.category_repository import CategoryRepository
 
 # Application
 from ...application.use_cases.email_use_cases import (
@@ -43,6 +45,10 @@ from ...application.use_cases.llm_use_cases import (
     SmartEmailComposerUseCase, GeminiChatUseCase,
     GeminiVisionUseCase, GeminiToolsUseCase, GeminiHealthCheckUseCase
 )
+from ...application.use_cases.category_use_cases import (
+    CreateCategoryUseCase, GetCategoryUseCase, UpdateCategoryUseCase,
+    DeleteCategoryUseCase, ListCategoriesUseCase, RecategorizeEmailsUseCase
+)
 
 
 class Container:
@@ -58,6 +64,7 @@ class Container:
         self._email_repository: Optional[EmailRepository] = None
         self._user_repository: Optional[UserRepository] = None
         self._oauth_repository: Optional[OAuthRepository] = None
+        self._category_repository: Optional[CategoryRepository] = None
         
         # Email use cases
         self._create_email_use_case: Optional[CreateEmailUseCase] = None
@@ -96,6 +103,14 @@ class Container:
         self._gemini_vision_use_case: Optional[GeminiVisionUseCase] = None
         self._gemini_tools_use_case: Optional[GeminiToolsUseCase] = None
         self._gemini_health_check_use_case: Optional[GeminiHealthCheckUseCase] = None
+        
+        # Category use cases
+        self._create_category_use_case: Optional[CreateCategoryUseCase] = None
+        self._get_category_use_case: Optional[GetCategoryUseCase] = None
+        self._update_category_use_case: Optional[UpdateCategoryUseCase] = None
+        self._delete_category_use_case: Optional[DeleteCategoryUseCase] = None
+        self._list_categories_use_case: Optional[ListCategoriesUseCase] = None
+        self._recategorize_emails_use_case: Optional[RecategorizeEmailsUseCase] = None
     
     # Configuration
     def settings(self) -> Settings:
@@ -172,6 +187,20 @@ class Container:
             db = firebase.get_firestore_client()
             self._oauth_repository = FirestoreOAuthRepository(db)
         return self._oauth_repository
+    
+    def category_repository(self) -> CategoryRepository:
+        """Get category repository"""
+        print(f"🔧 DEBUG: [Container] category_repository called")
+        if self._category_repository is None:
+            print(f"🔧 DEBUG: [Container] Creating new FirestoreCategoryRepository")
+            firebase = self.firebase_service()
+            db = firebase.get_firestore_client()
+            print(f"🔧 DEBUG: [Container] Firestore client type: {type(db).__name__}")
+            self._category_repository = FirestoreCategoryRepository(db)
+            print(f"🔧 DEBUG: [Container] FirestoreCategoryRepository created successfully")
+        else:
+            print(f"🔧 DEBUG: [Container] Returning existing category repository")
+        return self._category_repository
     
     # Email Use Cases
     def create_email_use_case(self) -> CreateEmailUseCase:
@@ -250,7 +279,8 @@ class Container:
             self._fetch_initial_emails_use_case = FetchInitialEmailsUseCase(
                 email_repo,
                 gmail_svc,
-                llm_svc
+                llm_svc,
+                self.category_repository()
             )
             print(f"🔧 DEBUG: [Container] FetchInitialEmailsUseCase created successfully")
         else:
@@ -430,6 +460,68 @@ class Container:
         if self._gemini_health_check_use_case is None:
             self._gemini_health_check_use_case = GeminiHealthCheckUseCase(self.llm_service())
         return self._gemini_health_check_use_case
+    
+    # Category Use Cases
+    def create_category_use_case(self) -> CreateCategoryUseCase:
+        """Get create category use case"""
+        print(f"🔧 DEBUG: [Container] create_category_use_case called")
+        if self._create_category_use_case is None:
+            print(f"🔧 DEBUG: [Container] Creating new CreateCategoryUseCase")
+            category_repo = self.category_repository()
+            email_repo = self.email_repository()
+            user_repo = self.user_repository()
+            print(f"🔧 DEBUG: [Container] Category repository type: {type(category_repo).__name__}")
+            print(f"🔧 DEBUG: [Container] Email repository type: {type(email_repo).__name__}")
+            print(f"🔧 DEBUG: [Container] User repository type: {type(user_repo).__name__}")
+            self._create_category_use_case = CreateCategoryUseCase(category_repo, email_repo, user_repo)
+            print(f"🔧 DEBUG: [Container] CreateCategoryUseCase created successfully")
+        else:
+            print(f"🔧 DEBUG: [Container] Returning existing CreateCategoryUseCase")
+        return self._create_category_use_case
+    
+    def get_category_use_case(self) -> GetCategoryUseCase:
+        """Get get category use case"""
+        if self._get_category_use_case is None:
+            self._get_category_use_case = GetCategoryUseCase(self.category_repository())
+        return self._get_category_use_case
+    
+    def update_category_use_case(self) -> UpdateCategoryUseCase:
+        """Get update category use case"""
+        if self._update_category_use_case is None:
+            self._update_category_use_case = UpdateCategoryUseCase(self.category_repository())
+        return self._update_category_use_case
+    
+    def delete_category_use_case(self) -> DeleteCategoryUseCase:
+        """Get delete category use case"""
+        if self._delete_category_use_case is None:
+            self._delete_category_use_case = DeleteCategoryUseCase(
+                self.category_repository(),
+                self.email_repository()
+            )
+        return self._delete_category_use_case
+    
+    def list_categories_use_case(self) -> ListCategoriesUseCase:
+        """Get list categories use case"""
+        print(f"🔧 DEBUG: [Container] list_categories_use_case called")
+        if self._list_categories_use_case is None:
+            print(f"🔧 DEBUG: [Container] Creating new ListCategoriesUseCase")
+            category_repo = self.category_repository()
+            print(f"🔧 DEBUG: [Container] Category repository type: {type(category_repo).__name__}")
+            self._list_categories_use_case = ListCategoriesUseCase(category_repo)
+            print(f"🔧 DEBUG: [Container] ListCategoriesUseCase created successfully")
+        else:
+            print(f"🔧 DEBUG: [Container] Returning existing ListCategoriesUseCase")
+        return self._list_categories_use_case
+    
+    def recategorize_emails_use_case(self) -> RecategorizeEmailsUseCase:
+        """Get recategorize emails use case"""
+        if self._recategorize_emails_use_case is None:
+            self._recategorize_emails_use_case = RecategorizeEmailsUseCase(
+                self.email_repository(),
+                self.category_repository(),
+                self.user_repository()
+            )
+        return self._recategorize_emails_use_case
     
     def initialize(self) -> None:
         """Initialize all services"""

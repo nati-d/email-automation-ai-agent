@@ -74,6 +74,7 @@ def _dto_to_response(dto: EmailDTO) -> dict:
         "summarized_at": dto.summarized_at.isoformat() if dto.summarized_at else None,
         # Email categorization
         "email_type": dto.email_type,
+        "category": dto.category,
         "categorized_at": dto.categorized_at.isoformat() if dto.categorized_at else None
     }
 
@@ -349,6 +350,49 @@ async def get_inbox_emails(
         return EmailListResponse(
             emails=email_responses,
             total_count=len(inbox_emails),
+            page=dto.page,
+            page_size=dto.page_size,
+            has_next=dto.has_next,
+            has_previous=dto.has_previous
+        )
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.get("/emails/category/{category_name}",
+           response_model=EmailListResponse,
+           summary="Get Emails by Category",
+           description="Get inbox emails for a specific category for the currently authenticated user.",
+           dependencies=[Depends(security)])
+async def get_emails_by_category(
+    category_name: str,
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = 50,
+    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+) -> EmailListResponse:
+    """
+    Get inbox emails for a specific category for the currently authenticated user.
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        # Get all emails and filter by category
+        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        
+        # Filter for inbox emails with the specified category
+        category_emails = [
+            email_dto for email_dto in dto.emails 
+            if email_dto.email_type == "inbox" and email_dto.category == category_name
+        ]
+        email_responses = [_dto_to_response(email_dto) for email_dto in category_emails]
+        
+        return EmailListResponse(
+            emails=email_responses,
+            total_count=len(category_emails),
             page=dto.page,
             page_size=dto.page_size,
             has_next=dto.has_next,

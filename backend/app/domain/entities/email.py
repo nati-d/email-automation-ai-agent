@@ -51,6 +51,7 @@ class Email(BaseEntity):
     summarized_at: Optional[datetime] = None
     # Email categorization
     email_type: EmailType = EmailType.INBOX
+    category: Optional[str] = None  # User-defined category for inbox emails
     categorized_at: Optional[datetime] = None
     
     def __post_init__(self):
@@ -233,10 +234,26 @@ class Email(BaseEntity):
         """Check if email is categorized as inbox"""
         return self.email_type == EmailType.INBOX
     
+    def update_category(self, category: str) -> None:
+        """Update the category for inbox emails"""
+        if self.email_type != EmailType.INBOX:
+            raise DomainValidationError("Categories can only be set for inbox emails")
+        
+        self.category = category
+        self.categorized_at = datetime.utcnow()
+        self.mark_updated()
+    
+    def reset_category(self) -> None:
+        """Reset the category (for re-categorization)"""
+        self.category = None
+        self.categorized_at = None
+        self.mark_updated()
+    
     def get_categorization_data(self) -> Dict[str, Any]:
         """Get categorization data as dictionary"""
         return {
             "email_type": self.email_type.value,
+            "category": self.category,
             "categorized_at": self.categorized_at.isoformat() if self.categorized_at else None,
             "is_task": self.is_task_email(),
             "is_inbox": self.is_inbox_email()

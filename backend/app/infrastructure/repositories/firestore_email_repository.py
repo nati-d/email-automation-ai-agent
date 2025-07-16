@@ -43,6 +43,7 @@ class FirestoreEmailRepository(EmailRepository):
             "summarized_at": email.summarized_at,
             # Email categorization
             "email_type": email.email_type.value,
+            "category": email.category,
             "categorized_at": email.categorized_at
         }
     
@@ -69,6 +70,7 @@ class FirestoreEmailRepository(EmailRepository):
             summarized_at=doc_data.get("summarized_at"),
             # Email categorization
             email_type=EmailType(doc_data.get("email_type", "inbox")),
+            category=doc_data.get("category"),
             categorized_at=doc_data.get("categorized_at")
         )
         
@@ -118,13 +120,16 @@ class FirestoreEmailRepository(EmailRepository):
     
     async def find_by_recipient(self, recipient: EmailAddress, limit: int = 50) -> List[Email]:
         """Find emails by recipient"""
-        query = self.db.collection(self.collection_name)\
-            .where("recipients", "array_contains", str(recipient))\
-            .order_by("created_at", direction=firestore.Query.DESCENDING)\
-            .limit(limit)
+        query = self.db.collection(self.collection_name).where("recipients", "array_contains", str(recipient)).limit(limit)
+        docs = query.get()
         
-        docs = query.stream()
-        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        emails = []
+        for doc in docs:
+            emails.append(self._doc_to_entity(doc.id, doc.to_dict()))
+        
+        return emails
+    
+
     
     async def find_by_status(self, status: EmailStatus, limit: int = 50) -> List[Email]:
         """Find emails by status"""

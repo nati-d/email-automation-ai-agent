@@ -48,6 +48,7 @@ class EmailUseCaseBase:
             summarized_at=email.summarized_at,
             # Email categorization
             email_type=email.email_type.value,
+            category=email.category,
             categorized_at=email.categorized_at
         )
     
@@ -307,11 +308,13 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
         self, 
         email_repository: EmailRepository,
         gmail_service,
-        llm_service: Optional[LLMService] = None
+        llm_service: Optional[LLMService] = None,
+        category_repository=None
     ):
         super().__init__(email_repository)
         self.gmail_service = gmail_service
         self.llm_service = llm_service
+        self.category_repository = category_repository
     
     async def execute(self, oauth_token, user_email: str, limit: int = 50) -> Dict[str, Any]:
         """Fetch initial emails from Gmail and store them"""
@@ -387,6 +390,30 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                             email_type = EmailType.TASKS if category == 'tasks' else EmailType.INBOX
                             saved_email.set_email_type(email_type)
                             print(f"🔧 DEBUG: Email type set to: {email_type.value}")
+                            
+                            # Step 1.5: Assign user-defined category for inbox emails
+                            if email_type == EmailType.INBOX and self.category_repository:
+                                try:
+                                    print(f"🔧 DEBUG: Assigning user-defined category for inbox email...")
+                                    user_categories = await self.category_repository.find_active_by_user_id(user_email)
+                                    if user_categories:
+                                        # Use simple keyword matching to assign category
+                                        assigned_category = self._assign_user_category(
+                                            email_content, saved_email.subject, user_categories
+                                        )
+                                        if assigned_category:
+                                            saved_email.update_category(assigned_category)
+                                            print(f"🔧 DEBUG: Assigned user category: {assigned_category}")
+                                        else:
+                                            print(f"🔧 DEBUG: No matching user category found, using 'uncategorized'")
+                                            saved_email.update_category("uncategorized")
+                                    else:
+                                        print(f"🔧 DEBUG: No user categories found, using 'uncategorized'")
+                                        saved_email.update_category("uncategorized")
+                                except Exception as cat_error:
+                                    print(f"⚠️ Failed to assign user category: {str(cat_error)}")
+                                    # Continue without user category assignment
+                                    pass
                             
                             # Step 2: Summarize email
                             print(f"🔧 DEBUG: Calling LLM service.summarize_email...")
@@ -471,6 +498,45 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                 "error": str(e),
                 "message": "Failed to import emails"
             }
+    
+    def _assign_user_category(self, email_content: str, subject: str, user_categories) -> Optional[str]:
+        """Assign a user-defined category to an email based on content and subject"""
+        # Combine content and subject for analysis
+        text_to_analyze = f"{subject} {email_content}".lower()
+        
+        # Define keywords for common category types
+        category_keywords = {
+            "work": ["work", "office", "meeting", "project", "deadline", "report", "presentation", "business", "client", "team"],
+            "amazon": ["amazon", "order", "shipping", "delivery", "tracking", "package", "purchase", "product"],
+            "mastercard": ["mastercard", "credit card", "payment", "transaction", "charge", "statement", "bank", "account"],
+            "personal": ["personal", "family", "friend", "birthday", "anniversary", "home", "love", "party"],
+            "finance": ["bank", "account", "balance", "transfer", "investment", "loan", "money", "financial", "budget"],
+            "shopping": ["purchase", "buy", "sale", "discount", "coupon", "deal", "store", "shop", "retail"],
+            "uncategorized": ["uncategorized", "unknown", "misc", "other"]
+        }
+        
+        # Find the best matching category
+        best_match = None
+        best_score = 0
+        
+        for category in user_categories:
+            category_name = category.name.lower()
+            
+            # Check if category name matches any predefined keywords
+            if category_name in category_keywords:
+                keywords = category_keywords[category_name]
+                score = sum(1 for keyword in keywords if keyword in text_to_analyze)
+                if score > best_score:
+                    best_score = score
+                    best_match = category.name
+            
+            # Also check if category name appears directly in the text
+            elif category_name in text_to_analyze:
+                if best_score == 0:  # Only use direct match if no keyword match found
+                    best_match = category.name
+                    best_score = 1
+        
+        return best_match
 
 
 class SummarizeEmailUseCase(EmailUseCaseBase):

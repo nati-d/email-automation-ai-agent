@@ -35,6 +35,7 @@ class EmailDTO:
     summarized_at: Optional[datetime] = None
     # Email categorization
     email_type: str = "inbox"
+    category: Optional[str] = None
     categorized_at: Optional[datetime] = None
     
     def __post_init__(self):
