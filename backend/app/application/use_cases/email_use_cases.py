@@ -166,14 +166,18 @@ class ListEmailsUseCase(EmailUseCaseBase):
     
     async def execute(
         self, 
-        sender: Optional[str] = None, 
+        sender: Optional[str] = None,
+        recipient: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50
     ) -> EmailListDTO:
         """List emails with optional filters"""
         emails = []
         
-        if sender:
+        if recipient:
+            recipient_email = EmailAddress.create(recipient)
+            emails = await self.email_repository.find_by_recipient(recipient_email, limit)
+        elif sender:
             sender_email = EmailAddress.create(sender)
             emails = await self.email_repository.find_by_sender(sender_email, limit)
         elif status:

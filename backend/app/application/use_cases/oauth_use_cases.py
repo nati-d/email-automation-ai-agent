@@ -42,7 +42,10 @@ class OAuthUseCaseBase:
             is_active=user.is_active,
             last_login=user.last_login,
             created_at=user.created_at,
-            updated_at=user.updated_at
+            updated_at=user.updated_at,
+            google_id=user.google_id,
+            profile_picture=user.profile_picture,
+            oauth_provider=user.oauth_provider
         )
 
 
