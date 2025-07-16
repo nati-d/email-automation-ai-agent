@@ -19,16 +19,9 @@ from app.infrastructure.di.container import get_container
 
 # Presentation layer - Clean controllers
 from app.presentation.api.email_controller import router as email_router
-from app.presentation.api.user_controller import router as user_router
 from app.presentation.api.health_controller import router as health_router
 from app.presentation.api.oauth_controller import router as oauth_router
-from app.presentation.api.test_controller import router as test_router
-from app.presentation.api.auth_test_controller import router as auth_test_router
-from app.presentation.api.llm_controller import router as llm_router
 from app.presentation.api.category_controller import router as category_router
-
-# Keep the old routers for compatibility (temporary)
-from app.routers import firestore
 
 
 @asynccontextmanager
@@ -83,28 +76,8 @@ tags_metadata = [
         "description": "Email management operations with clean architecture implementation.",
     },
     {
-        "name": "users", 
-        "description": "User management operations with clean architecture implementation.",
-    },
-    {
         "name": "auth",
         "description": "Google OAuth authentication operations including login, callback, and token management.",
-    },
-    {
-        "name": "firestore-legacy",
-        "description": "Legacy Firestore endpoints (for backward compatibility).",
-    },
-    {
-        "name": "test",
-        "description": "Test and debugging endpoints for development.",
-    },
-    {
-        "name": "auth-test",
-        "description": "Authentication middleware test endpoints for development.",
-    },
-    {
-        "name": "llm",
-        "description": "LLM-powered email features including content generation, sentiment analysis, and smart composition.",
     },
     {
         "name": "categories",
@@ -146,15 +119,8 @@ app.add_middleware(
 # Include clean architecture routers
 app.include_router(health_router, prefix=settings.api_prefix, tags=["health"])
 app.include_router(email_router, prefix=settings.api_prefix, tags=["emails"])
-app.include_router(user_router, prefix=settings.api_prefix, tags=["users"])
 app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
-app.include_router(test_router, prefix=settings.api_prefix, tags=["test"])
-app.include_router(auth_test_router, prefix=settings.api_prefix, tags=["auth-test"])
-app.include_router(llm_router, prefix=settings.api_prefix, tags=["llm"])
 app.include_router(category_router, prefix=settings.api_prefix, tags=["categories"])
-
-# Include legacy routers for backward compatibility
-app.include_router(firestore.router, prefix=settings.api_prefix, tags=["firestore-legacy"])
 
 
 @app.get("/", 
@@ -202,7 +168,7 @@ async def root():
         "endpoints": {
             "health": f"{settings.api_prefix}/health",
             "emails": f"{settings.api_prefix}/emails",
-            "users": f"{settings.api_prefix}/users"
+            "auth": f"{settings.api_prefix}/auth"
         },
         "status": "online"
     }
