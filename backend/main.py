@@ -24,6 +24,7 @@ from app.presentation.api.health_controller import router as health_router
 from app.presentation.api.oauth_controller import router as oauth_router
 from app.presentation.api.test_controller import router as test_router
 from app.presentation.api.auth_test_controller import router as auth_test_router
+from app.presentation.api.llm_controller import router as llm_router
 
 # Keep the old routers for compatibility (temporary)
 from app.routers import firestore
@@ -100,6 +101,10 @@ tags_metadata = [
         "name": "auth-test",
         "description": "Authentication middleware test endpoints for development.",
     },
+    {
+        "name": "llm",
+        "description": "LLM-powered email features including content generation, sentiment analysis, and smart composition.",
+    },
 ]
 
 # Create FastAPI instance with clean architecture configuration
@@ -140,6 +145,7 @@ app.include_router(user_router, prefix=settings.api_prefix, tags=["users"])
 app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(test_router, prefix=settings.api_prefix, tags=["test"])
 app.include_router(auth_test_router, prefix=settings.api_prefix, tags=["auth-test"])
+app.include_router(llm_router, prefix=settings.api_prefix, tags=["llm"])
 
 # Include legacy routers for backward compatibility
 app.include_router(firestore.router, prefix=settings.api_prefix, tags=["firestore-legacy"])

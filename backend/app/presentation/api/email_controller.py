@@ -11,7 +11,12 @@ from typing import Optional
 # Application layer
 from ...application.dto.email_dto import EmailDTO, EmailListDTO, SendEmailDTO
 from ...application.dto.user_dto import UserDTO
-from ...application.use_cases.email_use_cases import ListEmailsUseCase, SendNewEmailUseCase
+from ...application.use_cases.email_use_cases import (
+    ListEmailsUseCase, 
+    SendNewEmailUseCase,
+    SummarizeEmailUseCase,
+    SummarizeMultipleEmailsUseCase
+)
 
 # Domain exceptions
 from ...domain.exceptions.domain_exceptions import DomainException, EntityNotFoundError
@@ -39,6 +44,14 @@ def get_send_new_email_use_case(container: Container = Depends(get_container)) -
     return container.send_new_email_use_case()
 
 
+def get_summarize_email_use_case(container: Container = Depends(get_container)) -> SummarizeEmailUseCase:
+    return container.summarize_email_use_case()
+
+
+def get_summarize_multiple_emails_use_case(container: Container = Depends(get_container)) -> SummarizeMultipleEmailsUseCase:
+    return container.summarize_multiple_emails_use_case()
+
+
 def _dto_to_response(dto: EmailDTO) -> dict:
     return {
         "id": dto.id,
@@ -52,7 +65,13 @@ def _dto_to_response(dto: EmailDTO) -> dict:
         "sent_at": dto.sent_at,
         "created_at": dto.created_at,
         "updated_at": dto.updated_at,
-        "metadata": dto.metadata
+        "metadata": dto.metadata,
+        # AI Summarization fields
+        "summary": dto.summary,
+        "main_concept": dto.main_concept,
+        "sentiment": dto.sentiment,
+        "key_topics": dto.key_topics,
+        "summarized_at": dto.summarized_at.isoformat() if dto.summarized_at else None
     }
 
 
@@ -153,6 +172,104 @@ async def send_email(
         }
         print(f"🔍 DEBUG: Returning response with email status: {email_dto.status}")
         return response_data
+        
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.post("/emails/{email_id}/summarize",
+           response_model=dict,
+           summary="Summarize Email",
+           description="Summarize an email using AI to extract key information.",
+           dependencies=[Depends(security)])
+async def summarize_email(
+    email_id: str,
+    current_user: UserDTO = Depends(get_current_user),
+    use_case: SummarizeEmailUseCase = Depends(get_summarize_email_use_case)
+) -> dict:
+    """
+    Summarize an email using AI to extract key information including:
+    - Summary of content
+    - Main concept/purpose
+    - Sentiment analysis
+    - Key topics
+    
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        print(f"🔍 DEBUG: EmailController.summarize_email() called")
+        print(f"   👤 Current user: {current_user.email}")
+        print(f"   📧 Email ID: {email_id}")
+        
+        result = await use_case.execute(email_id)
+        
+        return {
+            "message": result.get("message", "Email summarization completed"),
+            "success": result.get("success", False),
+            "already_summarized": result.get("already_summarized", False),
+            "summarization": result.get("summarization", {})
+        }
+        
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.post("/emails/summarize-batch",
+           response_model=dict,
+           summary="Summarize Multiple Emails",
+           description="Summarize multiple emails in batch using AI.",
+           dependencies=[Depends(security)])
+async def summarize_multiple_emails(
+    email_ids: list[str],
+    current_user: UserDTO = Depends(get_current_user),
+    use_case: SummarizeMultipleEmailsUseCase = Depends(get_summarize_multiple_emails_use_case)
+) -> dict:
+    """
+    Summarize multiple emails in batch using AI.
+    
+    Args:
+        email_ids: List of email IDs to summarize
+        
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        print(f"🔍 DEBUG: EmailController.summarize_multiple_emails() called")
+        print(f"   👤 Current user: {current_user.email}")
+        print(f"   📧 Email IDs: {email_ids}")
+        
+        if not email_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "INVALID_REQUEST", "message": "email_ids list cannot be empty"}
+            )
+        
+        if len(email_ids) > 50:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "INVALID_REQUEST", "message": "Cannot summarize more than 50 emails at once"}
+            )
+        
+        result = await use_case.execute(email_ids)
+        
+        return {
+            "message": result.get("message", "Batch summarization completed"),
+            "success": result.get("success", False),
+            "total_processed": result.get("total_processed", 0),
+            "successful": result.get("successful", 0),
+            "already_summarized": result.get("already_summarized", 0),
+            "failed": result.get("failed", 0),
+            "errors": result.get("errors", [])
+        }
         
     except DomainException as e:
         raise _handle_domain_exception(e)

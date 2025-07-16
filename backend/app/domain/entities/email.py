@@ -37,6 +37,12 @@ class Email(BaseEntity):
     scheduled_at: Optional[datetime] = None
     sent_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # AI Summarization fields
+    summary: Optional[str] = None
+    main_concept: Optional[str] = None
+    sentiment: Optional[str] = None
+    key_topics: List[str] = field(default_factory=list)
+    summarized_at: Optional[datetime] = None
     
     def __post_init__(self):
         """Initialize Email entity and validate"""
@@ -119,7 +125,7 @@ class Email(BaseEntity):
         """Check if email can be edited"""
         return self.status in [EmailStatus.DRAFT, EmailStatus.SCHEDULED]
     
-    def update_content(self, subject: str = None, body: str = None, html_body: str = None) -> None:
+    def update_content(self, subject: Optional[str] = None, body: Optional[str] = None, html_body: Optional[str] = None) -> None:
         """Update email content if editable"""
         if not self.is_editable():
             raise DomainValidationError(f"Cannot edit email with status {self.status.value}")
@@ -137,4 +143,66 @@ class Email(BaseEntity):
         if html_body is not None:
             self.html_body = html_body
         
-        self.mark_updated() 
+        self.mark_updated()
+    
+    def set_summarization(
+        self,
+        summary: str,
+        main_concept: str,
+        sentiment: str,
+        key_topics: List[str]
+    ) -> None:
+        """Set AI-generated summarization data"""
+        print(f"🔧 DEBUG: [Email] set_summarization called")
+        print(f"🔧 DEBUG: [Email] summary: {summary[:100]}...")
+        print(f"🔧 DEBUG: [Email] main_concept: {main_concept}")
+        print(f"🔧 DEBUG: [Email] sentiment: {sentiment}")
+        print(f"🔧 DEBUG: [Email] key_topics: {key_topics}")
+        
+        if not summary.strip():
+            print(f"🔧 DEBUG: [Email] Summary is empty, raising error")
+            raise DomainValidationError("Summary cannot be empty")
+        
+        if not main_concept.strip():
+            print(f"🔧 DEBUG: [Email] Main concept is empty, raising error")
+            raise DomainValidationError("Main concept cannot be empty")
+        
+        if not sentiment.strip():
+            print(f"🔧 DEBUG: [Email] Sentiment is empty, raising error")
+            raise DomainValidationError("Sentiment cannot be empty")
+        
+        self.summary = summary.strip()
+        self.main_concept = main_concept.strip()
+        self.sentiment = sentiment.strip()
+        self.key_topics = [topic.strip() for topic in key_topics if topic.strip()]
+        self.summarized_at = datetime.utcnow()
+        self.mark_updated()
+        
+        print(f"🔧 DEBUG: [Email] Summarization set successfully")
+        print(f"🔧 DEBUG: [Email] Final summary: {self.summary[:100]}...")
+        print(f"🔧 DEBUG: [Email] Final main_concept: {self.main_concept}")
+        print(f"🔧 DEBUG: [Email] Final sentiment: {self.sentiment}")
+        print(f"🔧 DEBUG: [Email] Final key_topics: {self.key_topics}")
+        print(f"🔧 DEBUG: [Email] Final summarized_at: {self.summarized_at}")
+    
+    def has_summarization(self) -> bool:
+        """Check if email has been summarized"""
+        return (
+            self.summary is not None and
+            self.main_concept is not None and
+            self.sentiment is not None and
+            self.summarized_at is not None
+        )
+    
+    def get_summarization_data(self) -> Dict[str, Any]:
+        """Get summarization data as dictionary"""
+        if not self.has_summarization():
+            return {}
+        
+        return {
+            "summary": self.summary,
+            "main_concept": self.main_concept,
+            "sentiment": self.sentiment,
+            "key_topics": self.key_topics,
+            "summarized_at": self.summarized_at.isoformat() if self.summarized_at else None
+        } 

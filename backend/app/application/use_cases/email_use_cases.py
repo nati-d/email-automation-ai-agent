@@ -8,11 +8,15 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 
 from ...domain.entities.email import Email, EmailStatus
-from ...domain.value_objects.email_address import EmailAddress
 from ...domain.repositories.email_repository import EmailRepository
-from ...domain.exceptions.domain_exceptions import EntityNotFoundError, DomainValidationError
-
-from ..dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO, EmailListDTO
+from ...domain.value_objects.email_address import EmailAddress
+from ...domain.exceptions.domain_exceptions import (
+    DomainValidationError, 
+    EntityNotFoundError,
+    DomainException
+)
+from ...application.dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO, EmailListDTO
+from ...infrastructure.external_services.llm_service import LLMService
 
 
 class EmailUseCaseBase:
@@ -35,7 +39,13 @@ class EmailUseCaseBase:
             sent_at=email.sent_at,
             created_at=email.created_at,
             updated_at=email.updated_at,
-            metadata=email.metadata
+            metadata=email.metadata,
+            # AI Summarization fields
+            summary=email.summary,
+            main_concept=email.main_concept,
+            sentiment=email.sentiment,
+            key_topics=email.key_topics,
+            summarized_at=email.summarized_at
         )
     
     def _dto_to_entity(self, dto: CreateEmailDTO) -> Email:
@@ -90,9 +100,9 @@ class UpdateEmailUseCase(EmailUseCaseBase):
         
         # Update email content
         email.update_content(
-            subject=dto.subject,
-            body=dto.body,
-            html_body=dto.html_body
+            subject=dto.subject if dto.subject is not None else email.subject,
+            body=dto.body if dto.body is not None else email.body,
+            html_body=dto.html_body if dto.html_body is not None else email.html_body
         )
         
         # Update scheduling if provided
@@ -293,10 +303,12 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
     def __init__(
         self, 
         email_repository: EmailRepository,
-        gmail_service
+        gmail_service,
+        llm_service: Optional[LLMService] = None
     ):
         super().__init__(email_repository)
         self.gmail_service = gmail_service
+        self.llm_service = llm_service
     
     async def execute(self, oauth_token, user_email: str, limit: int = 50) -> Dict[str, Any]:
         """Fetch initial emails from Gmail and store them"""
@@ -321,15 +333,93 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                     "message": "No emails found to import"
                 }
             
-            # Store emails in repository
+            # Store emails in repository and summarize them
             stored_count = 0
             failed_count = 0
+            summarized_count = 0
+            
             for i, email in enumerate(emails):
                 try:
                     print(f"🔄 Storing email {i+1}/{len(emails)}: {email.subject[:50]}...")
                     saved_email = await self.email_repository.save(email)
                     print(f"✅ Stored email with ID: {saved_email.id}")
                     stored_count += 1
+                    
+                    # Summarize email if LLM service is available
+                    if self.llm_service:
+                        try:
+                            print(f"🔄 Summarizing email {saved_email.id}...")
+                            print(f"🔧 DEBUG: LLM service type: {type(self.llm_service).__name__}")
+                            print(f"🔧 DEBUG: Email subject: {saved_email.subject}")
+                            print(f"🔧 DEBUG: Email body length: {len(saved_email.body)} chars")
+                            print(f"🔧 DEBUG: Has HTML body: {saved_email.html_body is not None}")
+                            
+                            # Prepare content for summarization
+                            email_content = saved_email.body
+                            if saved_email.html_body:
+                                import re
+                                print(f"🔧 DEBUG: HTML body length: {len(saved_email.html_body)} chars")
+                                email_content = re.sub(r'<[^>]+>', '', saved_email.html_body)
+                                print(f"🔧 DEBUG: Cleaned HTML content length: {len(email_content)} chars")
+                            
+                            # Get context information
+                            sender = str(saved_email.sender)
+                            recipient = str(saved_email.recipients[0]) if saved_email.recipients else ""
+                            print(f"🔧 DEBUG: Sender: {sender}")
+                            print(f"🔧 DEBUG: Recipient: {recipient}")
+                            print(f"🔧 DEBUG: Content to summarize: {email_content[:200]}...")
+                            
+                            # Call LLM service for summarization
+                            print(f"🔧 DEBUG: Calling LLM service.summarize_email...")
+                            summarization_result = self.llm_service.summarize_email(
+                                email_content=email_content,
+                                email_subject=saved_email.subject,
+                                sender=sender,
+                                recipient=recipient
+                            )
+                            print(f"🔧 DEBUG: LLM service returned: {summarization_result}")
+                            
+                            # Validate summarization result
+                            if not summarization_result:
+                                print(f"⚠️ LLM service returned None or empty result")
+                                continue
+                            
+                            summary = summarization_result.get('summary', '')
+                            main_concept = summarization_result.get('main_concept', '')
+                            sentiment = summarization_result.get('sentiment', '')
+                            key_topics = summarization_result.get('key_topics', [])
+                            
+                            print(f"🔧 DEBUG: Extracted summary: {summary[:100]}...")
+                            print(f"🔧 DEBUG: Extracted main_concept: {main_concept}")
+                            print(f"🔧 DEBUG: Extracted sentiment: {sentiment}")
+                            print(f"🔧 DEBUG: Extracted key_topics: {key_topics}")
+                            
+                            # Set summarization data on email
+                            print(f"🔧 DEBUG: Setting summarization on email...")
+                            saved_email.set_summarization(
+                                summary=summary,
+                                main_concept=main_concept,
+                                sentiment=sentiment,
+                                key_topics=key_topics
+                            )
+                            print(f"🔧 DEBUG: Summarization set successfully")
+                            
+                            # Save updated email with summarization
+                            print(f"🔧 DEBUG: Saving email with summarization...")
+                            await self.email_repository.update(saved_email)
+                            print(f"✅ Email summarized successfully")
+                            summarized_count += 1
+                            
+                        except Exception as summary_error:
+                            print(f"⚠️ Failed to summarize email {saved_email.id}: {str(summary_error)}")
+                            print(f"🔧 DEBUG: Summary error type: {type(summary_error).__name__}")
+                            import traceback
+                            print(f"🔧 DEBUG: Summary error traceback: {traceback.format_exc()}")
+                            # Continue with next email even if summarization fails
+                            continue
+                    else:
+                        print(f"⚠️ LLM service is None - skipping summarization for email {saved_email.id}")
+                    
                 except Exception as e:
                     print(f"⚠️ Failed to store email {email.subject}: {str(e)}")
                     print(f"⚠️ Storage error type: {type(e).__name__}")
@@ -339,14 +429,16 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
             print(f"✅ Email import complete:")
             print(f"   - Successfully imported: {stored_count}")
             print(f"   - Failed to import: {failed_count}")
+            print(f"   - Summarized: {summarized_count}")
             print(f"   - Total processed: {len(emails)}")
             
             return {
                 "success": True,
                 "emails_imported": stored_count,
                 "emails_failed": failed_count,
+                "emails_summarized": summarized_count,
                 "total_found": len(emails),
-                "message": f"Successfully imported {stored_count} emails"
+                "message": f"Successfully imported {stored_count} emails (summarized: {summarized_count})"
             }
             
         except Exception as e:
@@ -359,4 +451,236 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                 "emails_imported": 0,
                 "error": str(e),
                 "message": "Failed to import emails"
+            }
+
+
+class SummarizeEmailUseCase(EmailUseCaseBase):
+    """Use case for summarizing email content using AI"""
+    
+    def __init__(
+        self, 
+        email_repository: EmailRepository,
+        llm_service: LLMService
+    ):
+        super().__init__(email_repository)
+        self.llm_service = llm_service
+    
+    async def execute(self, email_id: str) -> Dict[str, Any]:
+        """Summarize an email using AI"""
+        try:
+            print(f"🔄 SummarizeEmailUseCase.execute called for email: {email_id}")
+            
+            # Get email from repository
+            email = await self.email_repository.find_by_id(email_id)
+            if not email:
+                raise EntityNotFoundError("Email", email_id)
+            
+            print(f"✅ Found email: {email.subject}")
+            
+            # Check if already summarized
+            if email.has_summarization():
+                print("ℹ️ Email already has summarization")
+                return {
+                    "success": True,
+                    "already_summarized": True,
+                    "summarization": email.get_summarization_data(),
+                    "message": "Email already summarized"
+                }
+            
+            # Prepare content for summarization
+            email_content = email.body
+            if email.html_body:
+                # Use HTML body if available, but strip HTML tags for better analysis
+                import re
+                email_content = re.sub(r'<[^>]+>', '', email.html_body)
+            
+            # Get context information
+            sender = str(email.sender)
+            recipient = str(email.recipients[0]) if email.recipients else ""
+            
+            print(f"🔄 Calling LLM service to summarize email...")
+            print(f"   - Content length: {len(email_content)} chars")
+            print(f"   - Subject: {email.subject}")
+            print(f"   - Sender: {sender}")
+            print(f"   - Recipient: {recipient}")
+            
+            # Call LLM service for summarization
+            summarization_result = self.llm_service.summarize_email(
+                email_content=email_content,
+                email_subject=email.subject,
+                sender=sender,
+                recipient=recipient
+            )
+            
+            print(f"✅ LLM summarization completed:")
+            print(f"   - Summary: {summarization_result.get('summary', 'N/A')[:100]}...")
+            print(f"   - Main concept: {summarization_result.get('main_concept', 'N/A')}")
+            print(f"   - Sentiment: {summarization_result.get('sentiment', 'N/A')}")
+            print(f"   - Key topics: {summarization_result.get('key_topics', [])}")
+            
+            # Set summarization data on email
+            email.set_summarization(
+                summary=summarization_result.get('summary', ''),
+                main_concept=summarization_result.get('main_concept', ''),
+                sentiment=summarization_result.get('sentiment', ''),
+                key_topics=summarization_result.get('key_topics', [])
+            )
+            
+            # Save updated email
+            print("🔄 Saving email with summarization...")
+            await self.email_repository.update(email)
+            print("✅ Email saved with summarization")
+            
+            return {
+                "success": True,
+                "already_summarized": False,
+                "summarization": email.get_summarization_data(),
+                "message": "Email summarized successfully"
+            }
+            
+        except Exception as e:
+            print(f"❌ Failed to summarize email: {str(e)}")
+            print(f"❌ Error type: {type(e).__name__}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to summarize email"
+            }
+
+
+class SummarizeMultipleEmailsUseCase(EmailUseCaseBase):
+    """Use case for summarizing multiple emails in batch"""
+    
+    def __init__(
+        self, 
+        email_repository: EmailRepository,
+        llm_service: LLMService
+    ):
+        super().__init__(email_repository)
+        self.llm_service = llm_service
+    
+    async def execute(self, email_ids: List[str], max_concurrent: int = 5) -> Dict[str, Any]:
+        """Summarize multiple emails using AI"""
+        try:
+            print(f"🔄 SummarizeMultipleEmailsUseCase.execute called for {len(email_ids)} emails")
+            
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+            
+            # Create summarization tasks
+            tasks = []
+            for email_id in email_ids:
+                task = self._summarize_single_email(email_id)
+                tasks.append(task)
+            
+            # Execute tasks with concurrency limit
+            results = []
+            for i in range(0, len(tasks), max_concurrent):
+                batch = tasks[i:i + max_concurrent]
+                batch_results = await asyncio.gather(*batch, return_exceptions=True)
+                results.extend(batch_results)
+            
+            # Process results
+            successful = 0
+            failed = 0
+            already_summarized = 0
+            errors = []
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    failed += 1
+                    errors.append(str(result))
+                elif result.get('success'):
+                    successful += 1
+                    if result.get('already_summarized'):
+                        already_summarized += 1
+                else:
+                    failed += 1
+                    errors.append(result.get('error', 'Unknown error'))
+            
+            print(f"✅ Batch summarization completed:")
+            print(f"   - Successful: {successful}")
+            print(f"   - Already summarized: {already_summarized}")
+            print(f"   - Failed: {failed}")
+            
+            return {
+                "success": True,
+                "total_processed": len(email_ids),
+                "successful": successful,
+                "already_summarized": already_summarized,
+                "failed": failed,
+                "errors": errors[:10],  # Limit error list
+                "message": f"Processed {len(email_ids)} emails"
+            }
+            
+        except Exception as e:
+            print(f"❌ Failed to summarize multiple emails: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to summarize emails"
+            }
+    
+    async def _summarize_single_email(self, email_id: str) -> Dict[str, Any]:
+        """Helper method to summarize a single email"""
+        try:
+            # Get email from repository
+            email = await self.email_repository.find_by_id(email_id)
+            if not email:
+                return {
+                    "success": False,
+                    "error": f"Email {email_id} not found"
+                }
+            
+            # Check if already summarized
+            if email.has_summarization():
+                return {
+                    "success": True,
+                    "already_summarized": True,
+                    "email_id": email_id
+                }
+            
+            # Prepare content for summarization
+            email_content = email.body
+            if email.html_body:
+                import re
+                email_content = re.sub(r'<[^>]+>', '', email.html_body)
+            
+            # Get context information
+            sender = str(email.sender)
+            recipient = str(email.recipients[0]) if email.recipients else ""
+            
+            # Call LLM service for summarization
+            summarization_result = self.llm_service.summarize_email(
+                email_content=email_content,
+                email_subject=email.subject,
+                sender=sender,
+                recipient=recipient
+            )
+            
+            # Set summarization data on email
+            email.set_summarization(
+                summary=summarization_result.get('summary', ''),
+                main_concept=summarization_result.get('main_concept', ''),
+                sentiment=summarization_result.get('sentiment', ''),
+                key_topics=summarization_result.get('key_topics', [])
+            )
+            
+            # Save updated email
+            await self.email_repository.update(email)
+            
+            return {
+                "success": True,
+                "already_summarized": False,
+                "email_id": email_id,
+                "summarization": email.get_summarization_data()
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "email_id": email_id
             } 

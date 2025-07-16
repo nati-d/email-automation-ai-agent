@@ -228,6 +228,8 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
                         print(f"🔧 DEBUG: fetch_emails_use_case type: {type(self.fetch_emails_use_case).__name__}")
                         print(f"🔧 DEBUG: token type: {type(token).__name__}")
                         print(f"🔧 DEBUG: user email: {user.email.value}")
+                        print(f"🔧 DEBUG: is_new_user: {is_new_user}")
+                        print(f"🔧 DEBUG: fetch_emails_use_case is None: {self.fetch_emails_use_case is None}")
                         
                         email_result = await self.fetch_emails_use_case.execute(
                             oauth_token=token,
@@ -237,6 +239,7 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
                         result["email_import"] = email_result
                         print(f"✅ Email import result: {email_result}")
                         print(f"📊 Emails imported: {email_result.get('emails_imported', 0)}")
+                        print(f"📊 Emails summarized: {email_result.get('emails_summarized', 0)}")
                     except Exception as e:
                         print(f"⚠️ Failed to fetch initial emails, but continuing: {str(e)}")
                         print(f"⚠️ Email fetch error type: {type(e).__name__}")

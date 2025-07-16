@@ -78,6 +78,12 @@ class Settings(BaseSettings):
     max_recipients_per_email: int = 100
     max_email_size: int = 10 * 1024 * 1024  # 10MB
     
+    # LLM Configuration
+    llm_model_name: str = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash")
+    llm_vision_model_name: str = os.getenv("LLM_VISION_MODEL_NAME", "gemini-2.5-flash")
+    llm_pro_model_name: str = os.getenv("LLM_PRO_MODEL_NAME", "gemini-2.5-pro")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
