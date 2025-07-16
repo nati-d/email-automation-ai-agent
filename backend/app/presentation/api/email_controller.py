@@ -9,9 +9,9 @@ from fastapi.security import HTTPBearer
 from typing import Optional
 
 # Application layer
-from ...application.dto.email_dto import EmailDTO, EmailListDTO
+from ...application.dto.email_dto import EmailDTO, EmailListDTO, SendEmailDTO
 from ...application.dto.user_dto import UserDTO
-from ...application.use_cases.email_use_cases import ListEmailsUseCase
+from ...application.use_cases.email_use_cases import ListEmailsUseCase, SendNewEmailUseCase
 
 # Domain exceptions
 from ...domain.exceptions.domain_exceptions import DomainException, EntityNotFoundError
@@ -20,7 +20,7 @@ from ...domain.exceptions.domain_exceptions import DomainException, EntityNotFou
 from ...infrastructure.di.container import Container, get_container
 
 # Presentation models
-from ..models.email_models import EmailListResponse
+from ..models.email_models import EmailListResponse, SendEmailRequest
 
 # Middleware
 from ..middleware.auth_middleware import get_current_user
@@ -33,6 +33,10 @@ router = APIRouter()
 
 def get_list_emails_use_case(container: Container = Depends(get_container)) -> ListEmailsUseCase:
     return container.list_emails_use_case()
+
+
+def get_send_new_email_use_case(container: Container = Depends(get_container)) -> SendNewEmailUseCase:
+    return container.send_new_email_use_case()
 
 
 def _dto_to_response(dto: EmailDTO) -> dict:
@@ -92,6 +96,51 @@ async def get_my_emails(
             has_next=dto.has_next,
             has_previous=dto.has_previous
         )
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.post("/emails/send",
+           response_model=dict,
+           summary="Send Email",
+           description="Send a new email using the authenticated user as sender.",
+           dependencies=[Depends(security)])
+async def send_email(
+    request: SendEmailRequest,
+    current_user: UserDTO = Depends(get_current_user),
+    use_case: SendNewEmailUseCase = Depends(get_send_new_email_use_case)
+) -> dict:
+    """
+    Send a new email using the authenticated user as the sender.
+    
+    The sender will automatically be set to the authenticated user's email address.
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        # Convert recipients to strings
+        recipients = [str(recipient) for recipient in request.recipients]
+        
+        # Execute use case with authenticated user as sender
+        email_dto = await use_case.execute(
+            sender_email=current_user.email,
+            recipients=recipients,
+            subject=request.subject,
+            body=request.body,
+            html_body=request.html_body
+        )
+        
+        return {
+            "message": "Email sent successfully",
+            "email": _dto_to_response(email_dto),
+            "sender": current_user.email,
+            "recipients": recipients
+        }
+        
     except DomainException as e:
         raise _handle_domain_exception(e)
     except Exception as e:

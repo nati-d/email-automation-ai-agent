@@ -147,6 +147,58 @@ class SendEmailUseCase(EmailUseCaseBase):
             raise
 
 
+class SendNewEmailUseCase(EmailUseCaseBase):
+    """Use case for creating and sending a new email"""
+    
+    def __init__(self, email_repository: EmailRepository, email_service=None):
+        super().__init__(email_repository)
+        self.email_service = email_service
+    
+    async def execute(self, sender_email: str, recipients: List[str], subject: str, body: str, html_body: Optional[str] = None) -> EmailDTO:
+        """Create and send a new email"""
+        
+        # Create email entity
+        sender = EmailAddress.create(sender_email)
+        recipient_addresses = [EmailAddress.create(recipient) for recipient in recipients]
+        
+        email = Email(
+            sender=sender,
+            recipients=recipient_addresses,
+            subject=subject,
+            body=body,
+            html_body=html_body
+        )
+        
+        # Save email first
+        saved_email = await self.email_repository.save(email)
+        
+        # Mark as sending
+        saved_email.mark_as_sending()
+        await self.email_repository.update(saved_email)
+        
+        try:
+            # Send email using email service if available
+            if self.email_service:
+                await self.email_service.send_email(
+                    sender=sender_email,
+                    recipients=recipients,
+                    subject=subject,
+                    body=body,
+                    html_body=html_body
+                )
+            
+            # Mark as sent
+            saved_email.mark_as_sent()
+            updated_email = await self.email_repository.update(saved_email)
+            return self._entity_to_dto(updated_email)
+        
+        except Exception as e:
+            # Mark as failed
+            saved_email.mark_as_failed(str(e))
+            await self.email_repository.update(saved_email)
+            raise DomainValidationError(f"Failed to send email: {str(e)}")
+
+
 class ScheduleEmailUseCase(EmailUseCaseBase):
     """Use case for scheduling emails"""
     

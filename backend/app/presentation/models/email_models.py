@@ -120,4 +120,24 @@ class EmailListResponse(PaginationResponse):
                 "has_next": False,
                 "has_previous": False
             }
+        }
+
+
+class SendEmailRequest(BaseModel):
+    """Request model for sending emails"""
+    recipients: List[EmailStr] = Field(..., min_items=1, max_items=100, description="List of recipient email addresses")
+    subject: str = Field(..., min_length=1, max_length=200, description="Email subject")
+    body: str = Field(..., min_length=1, max_length=50000, description="Email body text")
+    html_body: Optional[str] = Field(None, max_length=100000, description="HTML version of email body")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata for the email")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "recipients": ["user@example.com", "admin@example.com"],
+                "subject": "Important Update",
+                "body": "This is an important update about your account.",
+                "html_body": "<h1>Important Update</h1><p>This is an important update about your account.</p>",
+                "metadata": {"priority": "high", "category": "account"}
+            }
         } 
