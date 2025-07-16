@@ -122,9 +122,19 @@ async def send_email(
     Requires a valid session ID as Bearer token in Authorization header.
     """
     try:
+        print(f"🔍 DEBUG: EmailController.send_email() called")
+        print(f"   👤 Current user: {current_user.email}")
+        print(f"   📧 Request details:")
+        print(f"      recipients: {request.recipients}")
+        print(f"      subject: {request.subject}")
+        print(f"      body length: {len(request.body)} chars")
+        print(f"      html_body: {'provided' if request.html_body else 'None'}")
+        
         # Convert recipients to strings
         recipients = [str(recipient) for recipient in request.recipients]
+        print(f"🔍 DEBUG: Converted recipients: {recipients}")
         
+        print(f"🔍 DEBUG: About to execute use case")
         # Execute use case with authenticated user as sender
         email_dto = await use_case.execute(
             sender_email=current_user.email,
@@ -133,13 +143,16 @@ async def send_email(
             body=request.body,
             html_body=request.html_body
         )
+        print(f"🔍 DEBUG: Use case executed successfully, email_dto.id: {email_dto.id}")
         
-        return {
+        response_data = {
             "message": "Email sent successfully",
             "email": _dto_to_response(email_dto),
             "sender": current_user.email,
             "recipients": recipients
         }
+        print(f"🔍 DEBUG: Returning response with email status: {email_dto.status}")
+        return response_data
         
     except DomainException as e:
         raise _handle_domain_exception(e)
