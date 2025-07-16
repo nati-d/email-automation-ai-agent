@@ -292,19 +292,35 @@ async def get_current_user_info(
     - **session_id**: The OAuth session ID returned during login
     """
     try:
+        print(f"🔍 Getting user info for session_id: {session_id}")
         result = await use_case.execute(session_id)
+        print(f"✅ Use case executed successfully, result keys: {result.keys()}")
         
         user_data = result["user"]
         session_info = result["session_info"]
         
+        print(f"👤 User data: {user_data}")
+        print(f"📋 Session info: {session_info}")
+        
+        # Convert UserDTO to dict for response model
+        if hasattr(user_data, '__dict__'):
+            user_dict = user_data.__dict__
+        else:
+            user_dict = user_data
+            
         return OAuthUserInfoResponse(
-            user=OAuthUserResponse(**user_data),
+            user=OAuthUserResponse(**user_dict),
             session_info=session_info
         )
         
     except DomainException as e:
+        print(f"❌ Domain exception in get_current_user_info: {str(e)}")
         raise _handle_domain_exception(e)
     except Exception as e:
+        print(f"❌ Unexpected exception in get_current_user_info: {str(e)}")
+        print(f"❌ Exception type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "INTERNAL_ERROR", "message": str(e)}
