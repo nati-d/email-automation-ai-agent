@@ -10,6 +10,10 @@ A FastAPI backend application for the Email Agent project.
 - **Environment Configuration**: Flexible configuration using environment variables
 - **Health Checks**: Built-in health monitoring endpoints
 - **Modular Structure**: Organized codebase with separation of concerns
+- **Google OAuth Integration**: Secure authentication with Google accounts
+- **Email Management**: Send, receive, and manage emails
+- **AI-Powered Email Summarization**: Automatic email analysis using Google Gemini AI
+- **Bearer Token Authentication**: Secure API access with session-based tokens
 
 ## Project Structure
 
@@ -72,6 +76,34 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 - `GET /api/health` - Basic health check
 - `GET /api/health/detailed` - Detailed health information
 
+### Authentication
+
+- `GET /api/auth/google/login` - Initiate Google OAuth login
+- `GET /api/auth/google/callback` - Handle OAuth callback
+- `GET /api/auth/me` - Get current user info (requires Bearer token)
+- `POST /api/auth/refresh` - Refresh OAuth token (requires Bearer token)
+- `POST /api/auth/logout` - Logout and revoke tokens (requires Bearer token)
+
+### Email Management
+
+- `GET /api/emails` - Get user's emails (requires Bearer token)
+- `POST /api/emails/send` - Send email (requires Bearer token)
+
+### AI Email Summarization
+
+- `POST /api/emails/{email_id}/summarize` - Summarize single email (requires Bearer token)
+- `POST /api/emails/summarize-batch` - Summarize multiple emails in batch (requires Bearer token)
+
+### LLM Services
+
+- `GET /api/llm/health` - LLM service health check
+- `POST /api/llm/generate` - Generate content using Gemini AI
+- `POST /api/llm/chat` - Start chat session
+- `POST /api/llm/chat/{session_id}/message` - Send message to chat session
+- `POST /api/llm/email/write` - Generate email content
+- `POST /api/llm/email/analyze` - Analyze email sentiment
+- `POST /api/llm/email/suggest-subject` - Suggest email subject line
+
 ### Core Endpoints
 
 - `GET /` - Welcome message
@@ -90,20 +122,29 @@ The `--reload` flag enables auto-reloading when code changes are detected.
 
 Key environment variables (see `.env.example` for full list):
 
-- `DATABASE_URL`: Database connection string
-- `REDIS_URL`: Redis connection string
-- `SECRET_KEY`: JWT secret key for authentication
+- `GOOGLE_CLIENT_ID`: Google OAuth client ID
+- `GOOGLE_CLIENT_SECRET`: Google OAuth client secret
+- `GOOGLE_REDIRECT_URI`: OAuth redirect URI
+- `GEMINI_API_KEY`: Google Gemini AI API key (required for email summarization)
+- `FRONTEND_URL`: Frontend application URL
 - `SMTP_*`: Email server configuration
 - `ALLOWED_ORIGINS`: CORS allowed origins
 
 ## Next Steps
 
-1. **Database Setup**: Configure your database and create models in `app/models/`
-2. **Authentication**: Implement JWT authentication and user management
-3. **Email Integration**: Add email processing and sending capabilities
-4. **API Endpoints**: Create specific endpoints for your email agent functionality
-5. **Background Tasks**: Set up Celery for asynchronous email processing
-6. **Testing**: Add comprehensive tests for your API endpoints
+1. **OAuth Setup**: Configure Google OAuth credentials in Google Cloud Console
+2. **Gemini API**: Get a Gemini API key for email summarization features
+3. **Email Configuration**: Set up SMTP settings for email sending
+4. **Testing**: Test the OAuth flow and email summarization features
+5. **Frontend Integration**: Connect your frontend application to the API
+6. **Production Deployment**: Deploy to production with proper security settings
+
+## Documentation
+
+- [OAuth Authentication Guide](docs/BEARER_TOKEN_AUTH.md)
+- [Email Sending Guide](docs/EMAIL_SENDING_GUIDE.md)
+- [Email Summarization Guide](docs/EMAIL_SUMMARIZATION.md)
+- [LLM Service Documentation](docs/LLM_SERVICE.md)
 
 ## Dependencies
 

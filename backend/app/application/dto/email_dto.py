@@ -27,10 +27,22 @@ class EmailDTO:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     metadata: Dict[str, Any] = None
+    # AI Summarization fields
+    summary: Optional[str] = None
+    main_concept: Optional[str] = None
+    sentiment: Optional[str] = None
+    key_topics: List[str] = None
+    summarized_at: Optional[datetime] = None
+    # Email categorization
+    email_type: str = "inbox"
+    category: Optional[str] = None
+    categorized_at: Optional[datetime] = None
     
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
+        if self.key_topics is None:
+            self.key_topics = []
 
 
 @dataclass

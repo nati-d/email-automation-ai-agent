@@ -8,7 +8,7 @@ from typing import List, Optional
 from datetime import datetime
 from firebase_admin import firestore
 
-from ...domain.entities.email import Email, EmailStatus
+from ...domain.entities.email import Email, EmailStatus, EmailType
 from ...domain.value_objects.email_address import EmailAddress
 from ...domain.repositories.email_repository import EmailRepository
 from ...domain.exceptions.domain_exceptions import EntityNotFoundError
@@ -34,7 +34,17 @@ class FirestoreEmailRepository(EmailRepository):
             "sent_at": email.sent_at,
             "created_at": email.created_at,
             "updated_at": email.updated_at,
-            "metadata": email.metadata
+            "metadata": email.metadata,
+            # AI Summarization fields
+            "summary": email.summary,
+            "main_concept": email.main_concept,
+            "sentiment": email.sentiment,
+            "key_topics": email.key_topics,
+            "summarized_at": email.summarized_at,
+            # Email categorization
+            "email_type": email.email_type.value,
+            "category": email.category,
+            "categorized_at": email.categorized_at
         }
     
     def _doc_to_entity(self, doc_id: str, doc_data: dict) -> Email:
@@ -51,7 +61,17 @@ class FirestoreEmailRepository(EmailRepository):
             status=EmailStatus(doc_data["status"]),
             scheduled_at=doc_data.get("scheduled_at"),
             sent_at=doc_data.get("sent_at"),
-            metadata=doc_data.get("metadata", {})
+            metadata=doc_data.get("metadata", {}),
+            # AI Summarization fields
+            summary=doc_data.get("summary"),
+            main_concept=doc_data.get("main_concept"),
+            sentiment=doc_data.get("sentiment"),
+            key_topics=doc_data.get("key_topics", []),
+            summarized_at=doc_data.get("summarized_at"),
+            # Email categorization
+            email_type=EmailType(doc_data.get("email_type", "inbox")),
+            category=doc_data.get("category"),
+            categorized_at=doc_data.get("categorized_at")
         )
         
         # Set entity ID and timestamps
@@ -100,13 +120,16 @@ class FirestoreEmailRepository(EmailRepository):
     
     async def find_by_recipient(self, recipient: EmailAddress, limit: int = 50) -> List[Email]:
         """Find emails by recipient"""
-        query = self.db.collection(self.collection_name)\
-            .where("recipients", "array_contains", str(recipient))\
-            .order_by("created_at", direction=firestore.Query.DESCENDING)\
-            .limit(limit)
+        query = self.db.collection(self.collection_name).where("recipients", "array_contains", str(recipient)).limit(limit)
+        docs = query.get()
         
-        docs = query.stream()
-        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        emails = []
+        for doc in docs:
+            emails.append(self._doc_to_entity(doc.id, doc.to_dict()))
+        
+        return emails
+    
+
     
     async def find_by_status(self, status: EmailStatus, limit: int = 50) -> List[Email]:
         """Find emails by status"""
@@ -131,15 +154,27 @@ class FirestoreEmailRepository(EmailRepository):
     
     async def update(self, email: Email) -> Email:
         """Update an email"""
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] update called for email: {email.id}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Email has summarization: {email.has_summarization()}")
+        
         if not email.id:
             raise ValueError("Email ID is required for update")
         
         doc_data = self._entity_to_doc(email)
         doc_data["updated_at"] = firestore.SERVER_TIMESTAMP
         
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Document data keys: {list(doc_data.keys())}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Summary in doc_data: {doc_data.get('summary', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Main concept in doc_data: {doc_data.get('main_concept', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Sentiment in doc_data: {doc_data.get('sentiment', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Key topics in doc_data: {doc_data.get('key_topics', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Email type in doc_data: {doc_data.get('email_type', 'NOT_FOUND')}")
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Categorized at in doc_data: {doc_data.get('categorized_at', 'NOT_FOUND')}")
+        
         doc_ref = self.db.collection(self.collection_name).document(email.id)
         doc_ref.update(doc_data)
         
+        print(f"🔧 DEBUG: [FirestoreEmailRepository] Email updated successfully in Firestore")
         return email
     
     async def delete(self, email_id: str) -> bool:

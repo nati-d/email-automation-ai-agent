@@ -35,7 +35,7 @@ class EmailRepository(ABC):
         """Find emails by recipient"""
         pass
     
-    @abstractmethod
+
     async def find_by_status(self, status: EmailStatus, limit: int = 50) -> List[Email]:
         """Find emails by status"""
         pass
