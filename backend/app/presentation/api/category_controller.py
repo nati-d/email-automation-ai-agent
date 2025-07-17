@@ -127,8 +127,8 @@ async def create_category(
         dto = CreateCategoryDTO(
             user_id=current_user.id,
             name=request.name,
-            description=request.description,
-            color=request.color
+            description=request.description if request.description else None,
+            color=request.color if request.color else None
         )
         print(f"🔧 DEBUG: [CategoryController] DTO created: {dto}")
         

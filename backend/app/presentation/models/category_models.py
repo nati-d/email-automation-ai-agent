@@ -12,15 +12,13 @@ from datetime import datetime
 class CreateCategoryRequest(BaseModel):
     """Request model for creating categories"""
     name: str = Field(..., min_length=1, max_length=50, description="Category name")
-    description: Optional[str] = Field(None, max_length=200, description="Category description")
-    color: Optional[str] = Field(None, pattern="^#[0-9A-Fa-f]{6}$", description="Hex color code (e.g., #FF5733)")
+    description: Optional[str] = Field(None, max_length=200, description="Category description (optional)")
+    color: Optional[str] = Field(None, pattern="^#[0-9A-Fa-f]{6}$", description="Hex color code (optional, e.g., #FF5733)")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "name": "Work",
-                "description": "Work-related emails",
-                "color": "#FF5733"
+                "name": "Work"
             }
         }
 
