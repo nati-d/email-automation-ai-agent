@@ -388,25 +388,61 @@ class GetOAuthUserInfoUseCase(OAuthUseCaseBase):
     async def execute(self, session_id: str) -> Dict[str, Any]:
         """Get current user info from OAuth session"""
         
-        # Find session
-        session = await self.oauth_repository.find_session_by_id(session_id)
-        if not session:
-            raise EntityNotFoundError("OAuth session", session_id)
+        print(f"🔍 GetOAuthUserInfoUseCase: Looking for session_id: {session_id}")
         
-        if not session.is_valid():
-            raise DomainValidationError("OAuth session is not valid")
+        # Find session
+        try:
+            session = await self.oauth_repository.find_session_by_id(session_id)
+            print(f"📋 Session found: {session is not None}")
+            if not session:
+                print(f"❌ Session not found for ID: {session_id}")
+                raise EntityNotFoundError("OAuth session", session_id)
+            
+            print(f"✅ Session details - user_id: {session.user_id}, is_active: {session.is_active}")
+        except Exception as e:
+            print(f"❌ Error finding session: {str(e)}")
+            raise e
+        
+        try:
+            if not session.is_valid():
+                print(f"❌ Session is not valid")
+                raise DomainValidationError("OAuth session is not valid")
+            print(f"✅ Session is valid")
+        except Exception as e:
+            print(f"❌ Error validating session: {str(e)}")
+            raise e
         
         # Get user
         if session.user_id:
-            user = await self.user_repository.find_by_id(session.user_id)
-            if user:
-                return {
-                    "user": self._user_entity_to_dto(user),
-                    "session_info": {
-                        "provider": session.user_info.provider,
-                        "session_active": session.is_active,
-                        "token_expires_in": session.token.expires_in_seconds()
-                    }
-                }
+            try:
+                print(f"🔍 Looking for user with ID: {session.user_id}")
+                user = await self.user_repository.find_by_id(session.user_id)
+                print(f"👤 User found: {user is not None}")
+                if user:
+                    print(f"👤 User details - email: {user.email}, name: {user.name}")
+                    try:
+                        user_dto = self._user_entity_to_dto(user)
+                        print(f"✅ User DTO created successfully")
+                        
+                        session_info = {
+                            "provider": session.user_info.provider,
+                            "session_active": session.is_active,
+                            "token_expires_in": session.token.expires_in_seconds()
+                        }
+                        print(f"✅ Session info created successfully")
+                        
+                        return {
+                            "user": user_dto,
+                            "session_info": session_info
+                        }
+                    except Exception as e:
+                        print(f"❌ Error creating user DTO or session info: {str(e)}")
+                        import traceback
+                        print(f"❌ DTO creation traceback: {traceback.format_exc()}")
+                        raise e
+            except Exception as e:
+                print(f"❌ Error finding user: {str(e)}")
+                raise e
         
+        print(f"❌ No user_id in session or user not found")
         raise EntityNotFoundError("User", session.user_id or "unknown") 

@@ -319,6 +319,7 @@ async def get_current_user_info(
         
         # Get complete user and session info from use case
         result = await use_case.execute(session_id)
+        print(f"✅ Use case executed successfully, result keys: {result.keys()}")
         
         user_data = result["user"]
         session_info = result["session_info"]
@@ -348,8 +349,13 @@ async def get_current_user_info(
         )
         
     except DomainException as e:
+        print(f"❌ Domain exception in get_current_user_info: {str(e)}")
         raise _handle_domain_exception(e)
     except Exception as e:
+        print(f"❌ Unexpected exception in get_current_user_info: {str(e)}")
+        print(f"❌ Exception type: {type(e).__name__}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "INTERNAL_ERROR", "message": str(e)}
