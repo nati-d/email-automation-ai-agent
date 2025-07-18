@@ -18,12 +18,14 @@ from ..repositories.firestore_email_repository import FirestoreEmailRepository
 from ..repositories.firestore_user_repository import FirestoreUserRepository
 from ..repositories.firestore_oauth_repository import FirestoreOAuthRepository
 from ..repositories.firestore_category_repository import FirestoreCategoryRepository
+from ..repositories.firestore_user_account_repository import FirestoreUserAccountRepository
 
 # Domain
 from ...domain.repositories.email_repository import EmailRepository
 from ...domain.repositories.user_repository import UserRepository
 from ...domain.repositories.oauth_repository import OAuthRepository
 from ...domain.repositories.category_repository import CategoryRepository
+from ...domain.repositories.user_account_repository import UserAccountRepository
 
 # Application
 from ...application.use_cases.email_use_cases import (
@@ -37,7 +39,8 @@ from ...application.use_cases.user_use_cases import (
 )
 from ...application.use_cases.oauth_use_cases import (
     InitiateOAuthLoginUseCase, ProcessOAuthCallbackUseCase,
-    RefreshOAuthTokenUseCase, LogoutOAuthUseCase, GetOAuthUserInfoUseCase
+    RefreshOAuthTokenUseCase, LogoutOAuthUseCase, GetOAuthUserInfoUseCase,
+    AddAnotherAccountUseCase
 )
 from ...application.use_cases.llm_use_cases import (
     GenerateEmailContentUseCase, AnalyzeEmailSentimentUseCase,
@@ -48,6 +51,11 @@ from ...application.use_cases.llm_use_cases import (
 from ...application.use_cases.category_use_cases import (
     CreateCategoryUseCase, GetCategoryUseCase, UpdateCategoryUseCase,
     DeleteCategoryUseCase, ListCategoriesUseCase, RecategorizeEmailsUseCase
+)
+from ...application.use_cases.user_account_use_cases import (
+    CreateUserAccountUseCase, GetUserAccountsUseCase, GetActiveUserAccountsUseCase,
+    UpdateUserAccountUseCase, DeleteUserAccountUseCase, CheckAccountExistsUseCase,
+    AddAccountIfNotExistsUseCase
 )
 
 
@@ -65,6 +73,7 @@ class Container:
         self._user_repository: Optional[UserRepository] = None
         self._oauth_repository: Optional[OAuthRepository] = None
         self._category_repository: Optional[CategoryRepository] = None
+        self._user_account_repository: Optional[UserAccountRepository] = None
         
         # Email use cases
         self._create_email_use_case: Optional[CreateEmailUseCase] = None
@@ -92,6 +101,7 @@ class Container:
         self._refresh_oauth_token_use_case: Optional[RefreshOAuthTokenUseCase] = None
         self._logout_oauth_use_case: Optional[LogoutOAuthUseCase] = None
         self._get_oauth_user_info_use_case: Optional[GetOAuthUserInfoUseCase] = None
+        self._add_another_account_use_case: Optional[AddAnotherAccountUseCase] = None
         
         # LLM use cases
         self._generate_email_content_use_case: Optional[GenerateEmailContentUseCase] = None
@@ -111,6 +121,15 @@ class Container:
         self._delete_category_use_case: Optional[DeleteCategoryUseCase] = None
         self._list_categories_use_case: Optional[ListCategoriesUseCase] = None
         self._recategorize_emails_use_case: Optional[RecategorizeEmailsUseCase] = None
+        
+        # User account use cases
+        self._create_user_account_use_case: Optional[CreateUserAccountUseCase] = None
+        self._get_user_accounts_use_case: Optional[GetUserAccountsUseCase] = None
+        self._get_active_user_accounts_use_case: Optional[GetActiveUserAccountsUseCase] = None
+        self._update_user_account_use_case: Optional[UpdateUserAccountUseCase] = None
+        self._delete_user_account_use_case: Optional[DeleteUserAccountUseCase] = None
+        self._check_account_exists_use_case: Optional[CheckAccountExistsUseCase] = None
+        self._add_account_if_not_exists_use_case: Optional[AddAccountIfNotExistsUseCase] = None
     
     # Configuration
     def settings(self) -> Settings:
@@ -201,6 +220,14 @@ class Container:
         else:
             print(f"🔧 DEBUG: [Container] Returning existing category repository")
         return self._category_repository
+    
+    def user_account_repository(self) -> UserAccountRepository:
+        """Get user account repository"""
+        if self._user_account_repository is None:
+            firebase = self.firebase_service()
+            db = firebase.get_firestore_client()
+            self._user_account_repository = FirestoreUserAccountRepository(db)
+        return self._user_account_repository
     
     # Email Use Cases
     def create_email_use_case(self) -> CreateEmailUseCase:
@@ -372,7 +399,8 @@ class Container:
                 oauth_repository=oauth_repository,
                 user_repository=user_repository,
                 oauth_service=oauth_service,
-                fetch_emails_use_case=fetch_emails_use_case
+                fetch_emails_use_case=fetch_emails_use_case,
+                user_account_repository=self.user_account_repository()
             )
         return self._process_oauth_callback_use_case
     
@@ -405,6 +433,18 @@ class Container:
                 oauth_service=self.google_oauth_service()
             )
         return self._get_oauth_user_info_use_case
+    
+    def add_another_account_use_case(self) -> AddAnotherAccountUseCase:
+        """Get add another account use case"""
+        if self._add_another_account_use_case is None:
+            self._add_another_account_use_case = AddAnotherAccountUseCase(
+                oauth_repository=self.oauth_repository(),
+                user_repository=self.user_repository(),
+                oauth_service=self.google_oauth_service(),
+                fetch_emails_use_case=self.fetch_initial_emails_use_case(),
+                user_account_repository=self.user_account_repository()
+            )
+        return self._add_another_account_use_case
     
     # LLM Use Cases
     def generate_email_content_use_case(self) -> GenerateEmailContentUseCase:
@@ -522,6 +562,49 @@ class Container:
                 self.user_repository()
             )
         return self._recategorize_emails_use_case
+    
+    # User Account Use Cases
+    def create_user_account_use_case(self) -> CreateUserAccountUseCase:
+        """Get create user account use case"""
+        if self._create_user_account_use_case is None:
+            self._create_user_account_use_case = CreateUserAccountUseCase(self.user_account_repository())
+        return self._create_user_account_use_case
+    
+    def get_user_accounts_use_case(self) -> GetUserAccountsUseCase:
+        """Get user accounts use case"""
+        if self._get_user_accounts_use_case is None:
+            self._get_user_accounts_use_case = GetUserAccountsUseCase(self.user_account_repository())
+        return self._get_user_accounts_use_case
+    
+    def get_active_user_accounts_use_case(self) -> GetActiveUserAccountsUseCase:
+        """Get active user accounts use case"""
+        if self._get_active_user_accounts_use_case is None:
+            self._get_active_user_accounts_use_case = GetActiveUserAccountsUseCase(self.user_account_repository())
+        return self._get_active_user_accounts_use_case
+    
+    def update_user_account_use_case(self) -> UpdateUserAccountUseCase:
+        """Get update user account use case"""
+        if self._update_user_account_use_case is None:
+            self._update_user_account_use_case = UpdateUserAccountUseCase(self.user_account_repository())
+        return self._update_user_account_use_case
+    
+    def delete_user_account_use_case(self) -> DeleteUserAccountUseCase:
+        """Get delete user account use case"""
+        if self._delete_user_account_use_case is None:
+            self._delete_user_account_use_case = DeleteUserAccountUseCase(self.user_account_repository())
+        return self._delete_user_account_use_case
+    
+    def check_account_exists_use_case(self) -> CheckAccountExistsUseCase:
+        """Get check account exists use case"""
+        if self._check_account_exists_use_case is None:
+            self._check_account_exists_use_case = CheckAccountExistsUseCase(self.user_account_repository())
+        return self._check_account_exists_use_case
+    
+    def add_account_if_not_exists_use_case(self) -> AddAccountIfNotExistsUseCase:
+        """Get add account if not exists use case"""
+        if self._add_account_if_not_exists_use_case is None:
+            self._add_account_if_not_exists_use_case = AddAccountIfNotExistsUseCase(self.user_account_repository())
+        return self._add_account_if_not_exists_use_case
     
     def initialize(self) -> None:
         """Initialize all services"""

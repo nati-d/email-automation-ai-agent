@@ -22,6 +22,7 @@ from app.presentation.api.email_controller import router as email_router
 from app.presentation.api.health_controller import router as health_router
 from app.presentation.api.oauth_controller import router as oauth_router
 from app.presentation.api.category_controller import router as category_router
+from app.presentation.api.user_account_controller import router as user_account_router
 
 
 @asynccontextmanager
@@ -83,6 +84,10 @@ tags_metadata = [
         "name": "categories",
         "description": "Email category management for organizing inbox emails with user-defined categories.",
     },
+    {
+        "name": "user-accounts",
+        "description": "User account management for tracking associated email accounts.",
+    },
 ]
 
 # Create FastAPI instance with clean architecture configuration
@@ -121,6 +126,7 @@ app.include_router(health_router, prefix=settings.api_prefix, tags=["health"])
 app.include_router(email_router, prefix=settings.api_prefix, tags=["emails"])
 app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(category_router, prefix=settings.api_prefix, tags=["categories"])
+app.include_router(user_account_router, prefix=settings.api_prefix, tags=["user-accounts"])
 
 
 @app.get("/", 

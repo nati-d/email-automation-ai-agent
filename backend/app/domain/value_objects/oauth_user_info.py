@@ -35,6 +35,8 @@ class OAuthUserInfo:
         
         if self.provider not in ["google"]:
             raise DomainValidationError(f"Unsupported OAuth provider: {self.provider}")
+        
+        # Email validation is handled by EmailAddress class
     
     @classmethod
     def create_from_google(

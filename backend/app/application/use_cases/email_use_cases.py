@@ -336,15 +336,20 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
         self.llm_service = llm_service
         self.category_repository = category_repository
     
-    async def execute(self, oauth_token, user_email: str, limit: int = 50) -> Dict[str, Any]:
+    async def execute(self, oauth_token, user_email: str, limit: int = 50, account_owner: Optional[str] = None) -> Dict[str, Any]:
         """Fetch initial emails from Gmail and store them"""
         try:
             print(f"🔄 FetchInitialEmailsUseCase.execute called:")
             print(f"   - user_email: {user_email}")
             print(f"   - limit: {limit}")
+            print(f"   - account_owner: {account_owner}")
             print(f"   - oauth_token type: {type(oauth_token).__name__}")
             print(f"   - gmail_service type: {type(self.gmail_service).__name__}")
             print(f"   - email_repository type: {type(self.email_repository).__name__}")
+            
+            # Use account_owner if provided, otherwise use user_email
+            actual_account_owner = account_owner or user_email
+            print(f"   - actual_account_owner: {actual_account_owner}")
             
             # Fetch emails from Gmail
             print("🔄 Calling gmail_service.fetch_recent_emails...")
@@ -367,6 +372,14 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
             for i, email in enumerate(emails):
                 try:
                     print(f"🔄 Storing email {i+1}/{len(emails)}: {email.subject[:50]}...")
+                    
+                    # Update account ownership if different from default
+                    if actual_account_owner != user_email:
+                        email.account_owner = actual_account_owner
+                        email.email_holder = user_email
+                        print(f"   - Set account_owner: {email.account_owner}")
+                        print(f"   - Set email_holder: {email.email_holder}")
+                    
                     saved_email = await self.email_repository.save(email)
                     print(f"✅ Stored email with ID: {saved_email.id}")
                     stored_count += 1

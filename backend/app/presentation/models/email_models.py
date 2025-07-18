@@ -153,4 +153,34 @@ class SendEmailRequest(BaseModel):
                 "html_body": "<h1>Important Update</h1><p>This is an important update about your account.</p>",
                 "metadata": {"priority": "high", "category": "account"}
             }
-        } 
+        }
+
+
+class FetchEmailsByAccountRequest(BaseModel):
+    """Request model for fetching emails by account"""
+    email: str = Field(..., description="Email address of the account to fetch emails from")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "email": "work@example.com"
+            }
+        }
+
+
+class SendEmailResponse(BaseModel):
+    """Response model for send email operations"""
+    success: bool
+    message: str
+    email_id: Optional[str] = None
+    sent_at: Optional[datetime] = None
+
+
+class EmailSummaryResponse(BaseModel):
+    """Response model for email summarization"""
+    success: bool
+    message: str
+    summary: Optional[str] = None
+    sentiment: Optional[str] = None
+    key_points: Optional[List[str]] = None
+    action_items: Optional[List[str]] = None 

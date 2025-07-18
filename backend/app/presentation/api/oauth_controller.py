@@ -12,11 +12,9 @@ from typing import Optional
 # Application layer
 from ...application.dto.user_dto import UserDTO
 from ...application.use_cases.oauth_use_cases import (
-    InitiateOAuthLoginUseCase,
-    ProcessOAuthCallbackUseCase,
-    RefreshOAuthTokenUseCase,
-    LogoutOAuthUseCase,
-    GetOAuthUserInfoUseCase
+    InitiateOAuthLoginUseCase, ProcessOAuthCallbackUseCase,
+    RefreshOAuthTokenUseCase, LogoutOAuthUseCase, GetOAuthUserInfoUseCase,
+    AddAnotherAccountUseCase
 )
 
 # Domain exceptions
@@ -36,7 +34,9 @@ from ..models.oauth_models import (
     OAuthLogoutResponse,
     OAuthErrorResponse,
     OAuthUserResponse,
-    OAuthSessionInfo
+    OAuthSessionInfo,
+    AddAnotherAccountRequest,
+    AddAnotherAccountResponse
 )
 
 # Middleware
@@ -78,6 +78,10 @@ def get_oauth_user_info_use_case(
     container: Container = Depends(get_container)
 ) -> GetOAuthUserInfoUseCase:
     return container.get_oauth_user_info_use_case()
+
+
+def get_add_another_account_use_case(container: Container = Depends(get_container)) -> AddAnotherAccountUseCase:
+    return container.add_another_account_use_case()
 
 
 def _handle_domain_exception(e: DomainException) -> HTTPException:
@@ -186,7 +190,36 @@ async def google_oauth_callback(
             print(f"🔄 Redirecting to error page: {redirect_url}")
             return RedirectResponse(url=redirect_url)
         
-        # Process OAuth callback
+        # Check if this is an add account flow
+        is_add_account_flow = state and "_add_account" in state
+        
+        if is_add_account_flow:
+            # Extract session ID from state parameter
+            session_id = None
+            if "_add_account_" in state:
+                # Format: {random_state}_add_account_{session_id}
+                parts = state.split("_add_account_")
+                if len(parts) == 2:
+                    session_id = parts[1]
+                    print(f"🔄 Extracted session ID from state: {session_id}")
+            
+            print("🔄 Detected add account flow, redirecting to frontend with code/state")
+            redirect_params = [
+                f"flow=add_account",
+                f"code={code}",
+                f"state={state}",
+                f"status=success"
+            ]
+            
+            # Add session ID to redirect params if available
+            if session_id:
+                redirect_params.append(f"session_id={session_id}")
+            
+            redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
+            print(f"✅ Add account OAuth successful! Redirecting to: {redirect_url}")
+            return RedirectResponse(url=redirect_url)
+        
+        # Process OAuth callback for normal login flow
         print("🔄 Processing OAuth callback with use case...")
         try:
             result = await use_case.execute(code=code, state=state, error=error)
@@ -404,6 +437,97 @@ async def oauth_logout(
             token_revoked=result["token_revoked"],
             message="Successfully logged out",
             warning=result.get("warning")
+        )
+        
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        ) 
+
+
+
+@router.get("/oauth/add-another-account/initiate",
+           response_model=OAuthLoginResponse,
+           summary="Initiate Add Another Account OAuth",
+           description="Get OAuth URL for adding another email account to the current user.",
+           dependencies=[Depends(security)])
+async def initiate_add_another_account(
+    user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
+    use_case: InitiateOAuthLoginUseCase = Depends(get_initiate_oauth_login_use_case)
+) -> OAuthLoginResponse:
+    """
+    Initiate OAuth flow for adding another email account.
+    
+    This endpoint generates an OAuth authorization URL that the user can use
+    to authorize another Gmail account to be added to their existing account.
+    
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        current_user, session_id = user_and_session
+        print(f"🔄 initiate_add_another_account called for user: {current_user.email} with session: {session_id}")
+        
+        result = await use_case.execute(flow_type="add_account", session_id=session_id)
+        
+        return OAuthLoginResponse(
+            authorization_url=result["authorization_url"],
+            state=result["state"],
+            message="Redirect to the authorization URL to add another account"
+        )
+        
+    except DomainException as e:
+        raise _handle_domain_exception(e)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+        )
+
+
+@router.post("/oauth/add-another-account",
+           response_model=AddAnotherAccountResponse,
+           summary="Add Another Email Account",
+           description="Add another email account to the current user using OAuth.",
+           dependencies=[Depends(security)])
+async def add_another_account(
+    request: AddAnotherAccountRequest,
+    current_user: UserDTO = Depends(get_current_user),
+    use_case: AddAnotherAccountUseCase = Depends(get_add_another_account_use_case)
+) -> AddAnotherAccountResponse:
+    """
+    Add another email account to the current user using OAuth.
+    
+    This endpoint allows a logged-in user to add another email account (e.g., work email)
+    to their existing account. The new account's emails will be fetched and stored with:
+    - account_owner: current_user.email (the logged-in user)
+    - email_holder: new_account.email (the new account being added)
+    
+    Requires a valid session ID as Bearer token in Authorization header.
+    """
+    try:
+        print(f"🔄 add_another_account endpoint called:")
+        print(f"   - current_user.email: {current_user.email}")
+        print(f"   - code: {request.code[:20] if request.code else 'None'}...")
+        print(f"   - state: {request.state[:20] if request.state else 'None'}...")
+        
+        result = await use_case.execute(
+            code=request.code,
+            state=request.state,
+            current_user_email=current_user.email
+        )
+        
+        print(f"✅ add_another_account completed: {result.get('success', False)}")
+        
+        # Convert result to AddAnotherAccountResponse
+        return AddAnotherAccountResponse(
+            success=result.get('success', False),
+            message=result.get('message', ''),
+            account_added=result.get('account_added'),
+            email_import=result.get('email_import'),
+            error=result.get('error')
         )
         
     except DomainException as e:

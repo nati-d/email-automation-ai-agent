@@ -175,4 +175,47 @@ class OAuthErrorResponse(BaseModel):
                     "error_code": "access_denied"
                 }
             }
+        }
+
+
+class AddAnotherAccountRequest(BaseModel):
+    """Request model for adding another email account"""
+    code: str = Field(..., description="OAuth authorization code from Google")
+    state: str = Field(..., description="OAuth state parameter for security")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "code": "4/0AVMBsJgT6BQvaXgkTFXuwIePIU9hUNzDQPyaY5DrR2zoskBSEI-evBf4e75IUwVkpUtKgg",
+                "state": "secure-random-state-parameter"
+            }
+        }
+
+
+class AddAnotherAccountResponse(BaseModel):
+    """Response model for adding another email account"""
+    success: bool = Field(..., description="Whether the operation was successful")
+    message: str = Field(..., description="Status message")
+    account_added: Optional[Dict[str, Any]] = Field(None, description="Information about the added account")
+    email_import: Optional[Dict[str, Any]] = Field(None, description="Email import results")
+    error: Optional[str] = Field(None, description="Error code if failed")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Successfully added account work@company.com to user user@example.com",
+                "account_added": {
+                    "email": "work@company.com",
+                    "name": "Work Account",
+                    "picture": "https://lh3.googleusercontent.com/...",
+                    "provider": "google"
+                },
+                "email_import": {
+                    "success": True,
+                    "emails_imported": 25,
+                    "emails_summarized": 20,
+                    "message": "Successfully imported 25 emails"
+                }
+            }
         } 

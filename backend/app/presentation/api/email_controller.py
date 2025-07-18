@@ -1,445 +1,447 @@
 """
 Email Controller
 
-Only authenticated users can access their emails via GET /emails.
+API endpoints for email operations with clean architecture.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
-from typing import Optional
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 
-# Application layer
-from ...application.dto.email_dto import EmailDTO, EmailListDTO, SendEmailDTO
+from ...application.dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO
 from ...application.dto.user_dto import UserDTO
 from ...application.use_cases.email_use_cases import (
-    ListEmailsUseCase, 
-    SendNewEmailUseCase,
-    SummarizeEmailUseCase,
-    SummarizeMultipleEmailsUseCase,
-    GetEmailUseCase
+    CreateEmailUseCase, GetEmailUseCase, UpdateEmailUseCase, DeleteEmailUseCase,
+    SendNewEmailUseCase, ListEmailsUseCase, FetchInitialEmailsUseCase,
+    SummarizeEmailUseCase, SummarizeMultipleEmailsUseCase
+)
+from ..models.email_models import (
+    EmailResponse, CreateEmailRequest, UpdateEmailRequest, EmailListResponse,
+    SendEmailRequest, SendEmailResponse, EmailSummaryResponse, FetchEmailsByAccountRequest
 )
 
-# Domain exceptions
-from ...domain.exceptions.domain_exceptions import DomainException, EntityNotFoundError
-
-# Infrastructure
-from ...infrastructure.di.container import Container, get_container
-
-# Presentation models
-from ..models.email_models import EmailListResponse, SendEmailRequest
-
-# Middleware
 from ..middleware.auth_middleware import get_current_user
-
-# Security scheme
-security = HTTPBearer()
-
-router = APIRouter()
+from ...infrastructure.di.container import get_container
+from ...domain.value_objects.email_address import EmailAddress
 
 
-def get_list_emails_use_case(container: Container = Depends(get_container)) -> ListEmailsUseCase:
-    return container.list_emails_use_case()
-
-
-def get_send_new_email_use_case(container: Container = Depends(get_container)) -> SendNewEmailUseCase:
-    return container.send_new_email_use_case()
-
-
-def get_summarize_email_use_case(container: Container = Depends(get_container)) -> SummarizeEmailUseCase:
-    return container.summarize_email_use_case()
-
-
-def get_summarize_multiple_emails_use_case(container: Container = Depends(get_container)) -> SummarizeMultipleEmailsUseCase:
-    return container.summarize_multiple_emails_use_case()
-
-
-def get_get_email_use_case(container: Container = Depends(get_container)) -> GetEmailUseCase:
-    return container.get_email_use_case()
+router = APIRouter(prefix="/emails", tags=["emails"])
 
 
 def _dto_to_response(dto: EmailDTO) -> dict:
+    """Convert DTO to response dict"""
     return {
         "id": dto.id,
+        "subject": dto.subject,
         "sender": dto.sender,
         "recipients": dto.recipients,
-        "subject": dto.subject,
-        "body": dto.body,
-        "html_body": dto.html_body,
+        "cc": dto.cc,
+        "bcc": dto.bcc,
+        "content": dto.content,
+        "content_type": dto.content_type,
         "status": dto.status,
-        "scheduled_at": dto.scheduled_at,
+        "priority": dto.priority,
+        "category": dto.category,
         "sent_at": dto.sent_at,
         "created_at": dto.created_at,
         "updated_at": dto.updated_at,
         "metadata": dto.metadata,
-        # Account ownership fields
         "account_owner": dto.account_owner,
         "email_holder": dto.email_holder,
-        # AI Summarization fields
         "summary": dto.summary,
-        "main_concept": dto.main_concept,
         "sentiment": dto.sentiment,
-        "key_topics": dto.key_topics,
-        "summarized_at": dto.summarized_at.isoformat() if dto.summarized_at else None,
-        # Email categorization
-        "email_type": dto.email_type,
-        "category": dto.category,
-        "categorized_at": dto.categorized_at.isoformat() if dto.categorized_at else None
+        "key_points": dto.key_points,
+        "action_items": dto.action_items,
+        "summary_generated_at": dto.summary_generated_at
     }
 
 
-def _handle_domain_exception(e: DomainException) -> HTTPException:
-    if isinstance(e, EntityNotFoundError):
-        return HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": e.code, "message": e.message}
-        )
-    else:
-        return HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": e.code, "message": e.message}
-        )
-
-
-@router.get("/emails",
-           response_model=EmailListResponse,
-           summary="Get My Emails",
-           description="Get emails for the currently authenticated user.",
-           dependencies=[Depends(security)])
+@router.get("/", response_model=EmailListResponse)
 async def get_my_emails(
     current_user: UserDTO = Depends(get_current_user),
-    limit: int = 50,
-    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search: Optional[str] = Query(None, description="Search in subject and content")
+) -> EmailListResponse:
+    """Get emails for the current user with filtering and pagination"""
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    # Get emails filtered by account owner (current user's email)
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    emails = [EmailResponse(**{**email.__dict__}) for email in result.emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=result.total_count,
+        page=result.page,
+        page_size=result.page_size,
+        has_next=False,  # Simple pagination for now
+        has_prev=False
+    )
+
+
+@router.post("/fetch-by-account", response_model=EmailListResponse)
+async def get_emails_by_account(
+    request: FetchEmailsByAccountRequest,
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search: Optional[str] = Query(None, description="Search in subject and content")
 ) -> EmailListResponse:
     """
-    Get emails for the currently authenticated user.
-    Requires a valid session ID in either:
-    - X-Session-ID header
-    - session_id query parameter
-    """
-    try:
-        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
-        email_responses = [_dto_to_response(email_dto) for email_dto in dto.emails]
-        return EmailListResponse(
-            emails=email_responses,
-            total_count=dto.total_count,
-            page=dto.page,
-            page_size=dto.page_size,
-            has_next=dto.has_next,
-            has_previous=dto.has_previous
-        )
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
-
-
-@router.post("/emails/send",
-           response_model=dict,
-           summary="Send Email",
-           description="Send a new email using the authenticated user as sender.",
-           dependencies=[Depends(security)])
-async def send_email(
-    request: SendEmailRequest,
-    current_user: UserDTO = Depends(get_current_user),
-    use_case: SendNewEmailUseCase = Depends(get_send_new_email_use_case)
-) -> dict:
-    """
-    Send a new email using the authenticated user as the sender.
+    Get emails for a specific account if the current user owns it.
     
-    The sender will automatically be set to the authenticated user's email address.
-    Requires a valid session ID as Bearer token in Authorization header.
+    This endpoint requires authorization and only returns emails if:
+    1. The authenticated user owns the account (account_owner matches current user's email)
+    2. The requested email matches the email_holder field
     """
-    try:
-        print(f"🔍 DEBUG: EmailController.send_email() called")
-        print(f"   👤 Current user: {current_user.email}")
-        print(f"   📧 Request details:")
-        print(f"      recipients: {request.recipients}")
-        print(f"      subject: {request.subject}")
-        print(f"      body length: {len(request.body)} chars")
-        print(f"      html_body: {'provided' if request.html_body else 'None'}")
-        
-        # Convert recipients to strings
-        recipients = [str(recipient) for recipient in request.recipients]
-        print(f"🔍 DEBUG: Converted recipients: {recipients}")
-        
-        print(f"🔍 DEBUG: About to execute use case")
-        # Execute use case with authenticated user as sender
-        email_dto = await use_case.execute(
-            sender_email=current_user.email,
-            recipients=recipients,
-            subject=request.subject,
-            body=request.body,
-            html_body=request.html_body
-        )
-        print(f"🔍 DEBUG: Use case executed successfully, email_dto.id: {email_dto.id}")
-        
-        response_data = {
-            "message": "Email sent successfully",
-            "email": _dto_to_response(email_dto),
-            "sender": current_user.email,
-            "recipients": recipients
-        }
-        print(f"🔍 DEBUG: Returning response with email status: {email_dto.status}")
-        return response_data
-        
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
-
-
-@router.post("/emails/{email_id}/summarize",
-           response_model=dict,
-           summary="Summarize Email",
-           description="Summarize an email using AI to extract key information.",
-           dependencies=[Depends(security)])
-async def summarize_email(
-    email_id: str,
-    current_user: UserDTO = Depends(get_current_user),
-    use_case: SummarizeEmailUseCase = Depends(get_summarize_email_use_case)
-) -> dict:
-    """
-    Summarize an email using AI to extract key information including:
-    - Summary of content
-    - Main concept/purpose
-    - Sentiment analysis
-    - Key topics
+    # Extract email from request payload
+    email = request.email
     
-    Requires a valid session ID as Bearer token in Authorization header.
-    """
+    # Validate email format
     try:
-        print(f"🔍 DEBUG: EmailController.summarize_email() called")
-        print(f"   👤 Current user: {current_user.email}")
-        print(f"   📧 Email ID: {email_id}")
-        
-        result = await use_case.execute(email_id)
-        
-        return {
-            "message": result.get("message", "Email summarization completed"),
-            "success": result.get("success", False),
-            "already_summarized": result.get("already_summarized", False),
-            "summarization": result.get("summarization", {})
-        }
-        
-    except DomainException as e:
-        raise _handle_domain_exception(e)
+        EmailAddress.create(email)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid email format: {str(e)}"
         )
-
-
-@router.post("/emails/summarize-batch",
-           response_model=dict,
-           summary="Summarize Multiple Emails",
-           description="Summarize multiple emails in batch using AI.",
-           dependencies=[Depends(security)])
-async def summarize_multiple_emails(
-    email_ids: list[str],
-    current_user: UserDTO = Depends(get_current_user),
-    use_case: SummarizeMultipleEmailsUseCase = Depends(get_summarize_multiple_emails_use_case)
-) -> dict:
-    """
-    Summarize multiple emails in batch using AI.
     
-    Args:
-        email_ids: List of email IDs to summarize
-        
-    Requires a valid session ID as Bearer token in Authorization header.
-    """
-    try:
-        print(f"🔍 DEBUG: EmailController.summarize_multiple_emails() called")
-        print(f"   👤 Current user: {current_user.email}")
-        print(f"   📧 Email IDs: {email_ids}")
-        
-        if not email_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "INVALID_REQUEST", "message": "email_ids list cannot be empty"}
-            )
-        
-        if len(email_ids) > 50:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail={"error": "INVALID_REQUEST", "message": "Cannot summarize more than 50 emails at once"}
-            )
-        
-        result = await use_case.execute(email_ids)
-        
-        return {
-            "message": result.get("message", "Batch summarization completed"),
-            "success": result.get("success", False),
-            "total_processed": result.get("total_processed", 0),
-            "successful": result.get("successful", 0),
-            "already_summarized": result.get("already_summarized", 0),
-            "failed": result.get("failed", 0),
-            "errors": result.get("errors", [])
-        }
-        
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    # First, get emails filtered by account owner (current user's email)
+    # This ensures the user can only access emails they own
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    # Filter emails to only include those where email_holder matches the requested email
+    filtered_emails = []
+    for email_dto in result.emails:
+        if email_dto.email_holder == email:
+            filtered_emails.append(email_dto)
+    
+    # Convert to response format
+    emails = [EmailResponse(**{**email.__dict__}) for email in filtered_emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=len(filtered_emails),
+        page=1,
+        page_size=len(filtered_emails),
+        has_next=False,
+        has_prev=False
+    )
 
 
-@router.get("/emails/tasks",
-           response_model=EmailListResponse,
-           summary="Get Task Emails",
-           description="Get emails categorized as tasks for the currently authenticated user.",
-           dependencies=[Depends(security)])
+@router.get("/tasks", response_model=EmailListResponse)
 async def get_task_emails(
     current_user: UserDTO = Depends(get_current_user),
-    limit: int = 50,
-    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip")
 ) -> EmailListResponse:
-    """
-    Get emails categorized as tasks for the currently authenticated user.
-    Requires a valid session ID as Bearer token in Authorization header.
-    """
-    try:
-        # Filter by account owner and then filter for task emails
-        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
-        
-        # Filter for task emails
-        task_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "tasks"]
-        email_responses = [_dto_to_response(email_dto) for email_dto in task_emails]
-        
-        return EmailListResponse(
-            emails=email_responses,
-            total_count=len(task_emails),
-            page=dto.page,
-            page_size=dto.page_size,
-            has_next=dto.has_next,
-            has_previous=dto.has_previous
-        )
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
+    """Get task-related emails for the current user"""
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    # Filter for task emails
+    task_emails = [email for email in result.emails if email.category == "tasks"]
+    
+    emails = [EmailResponse(**{**email.__dict__}) for email in task_emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=len(task_emails),
+        page=1,
+        page_size=len(task_emails),
+        has_next=False,
+        has_prev=False
+    )
 
 
-@router.get("/emails/inbox",
-           response_model=EmailListResponse,
-           summary="Get Inbox Emails",
-           description="Get emails categorized as inbox for the currently authenticated user.",
-           dependencies=[Depends(security)])
+@router.get("/inbox", response_model=EmailListResponse)
 async def get_inbox_emails(
     current_user: UserDTO = Depends(get_current_user),
-    limit: int = 50,
-    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip")
 ) -> EmailListResponse:
-    """
-    Get emails categorized as inbox for the currently authenticated user.
-    Requires a valid session ID as Bearer token in Authorization header.
-    """
-    try:
-        # Filter by account owner and then filter for inbox emails
-        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
-        
-        # Filter for inbox emails
-        inbox_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "inbox"]
-        email_responses = [_dto_to_response(email_dto) for email_dto in inbox_emails]
-        
-        return EmailListResponse(
-            emails=email_responses,
-            total_count=len(inbox_emails),
-            page=dto.page,
-            page_size=dto.page_size,
-            has_next=dto.has_next,
-            has_previous=dto.has_previous
-        )
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
+    """Get inbox emails for the current user"""
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    # Filter for received emails
+    inbox_emails = [email for email in result.emails if email.status == "received"]
+    
+    emails = [EmailResponse(**{**email.__dict__}) for email in inbox_emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=len(inbox_emails),
+        page=1,
+        page_size=len(inbox_emails),
+        has_next=False,
+        has_prev=False
+    )
 
 
-@router.get("/emails/category/{category_name}",
-           response_model=EmailListResponse,
-           summary="Get Emails by Category",
-           description="Get inbox emails for a specific category for the currently authenticated user.",
-           dependencies=[Depends(security)])
+@router.get("/category/{category_name}", response_model=EmailListResponse)
 async def get_emails_by_category(
     category_name: str,
     current_user: UserDTO = Depends(get_current_user),
-    limit: int = 50,
-    use_case: ListEmailsUseCase = Depends(get_list_emails_use_case)
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip")
 ) -> EmailListResponse:
-    """
-    Get inbox emails for a specific category for the currently authenticated user.
-    Requires a valid session ID as Bearer token in Authorization header.
-    """
-    try:
-        # Filter by account owner and then filter for category
-        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
-        
-        # Filter for inbox emails with specific category
-        category_emails = [
-            email_dto for email_dto in dto.emails 
-            if email_dto.email_type == "inbox" and email_dto.category == category_name
-        ]
-        email_responses = [_dto_to_response(email_dto) for email_dto in category_emails]
-        
-        return EmailListResponse(
-            emails=email_responses,
-            total_count=len(category_emails),
-            page=dto.page,
-            page_size=dto.page_size,
-            has_next=dto.has_next,
-            has_previous=dto.has_previous
-        )
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
+    """Get emails by category for the current user"""
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    # Filter for category
+    category_emails = [email for email in result.emails if email.category == category_name]
+    
+    emails = [EmailResponse(**{**email.__dict__}) for email in category_emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=len(category_emails),
+        page=1,
+        page_size=len(category_emails),
+        has_next=False,
+        has_prev=False
+    )
 
 
-@router.get("/emails/{email_id}",
-           response_model=dict,
-           summary="Get Email by ID",
-           description="Get a single email by its ID for the authenticated user.",
-           dependencies=[Depends(security)])
-async def get_email_by_id(
+@router.get("/{email_id}", response_model=EmailResponse)
+async def get_email(
     email_id: str,
-    current_user: UserDTO = Depends(get_current_user),
-    use_case: GetEmailUseCase = Depends(get_get_email_use_case)
+    current_user: UserDTO = Depends(get_current_user)
+) -> EmailResponse:
+    """Get a specific email by ID"""
+    container = get_container()
+    use_case = container.get_email_use_case()
+    
+    email = await use_case.execute(email_id)
+    
+    # Check if the user owns this email
+    if email.account_owner != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this email"
+        )
+    
+    return EmailResponse(**{**email.__dict__})
+
+
+@router.post("/", response_model=EmailResponse)
+async def create_email(
+    request: CreateEmailRequest,
+    current_user: UserDTO = Depends(get_current_user)
+) -> EmailResponse:
+    """Create a new email"""
+    container = get_container()
+    use_case = container.create_email_use_case()
+    
+    dto = CreateEmailDTO(
+        subject=request.subject,
+        sender=request.sender,
+        recipients=request.recipients,
+        cc=request.cc,
+        bcc=request.bcc,
+        content=request.content,
+        content_type=request.content_type,
+        status=request.status,
+        priority=request.priority,
+        category=request.category,
+        metadata=request.metadata,
+        account_owner=current_user.email,  # Set current user as account owner
+        email_holder=current_user.email    # Set current user as email holder for outgoing emails
+    )
+    
+    email = await use_case.execute(dto)
+    
+    return EmailResponse(**{**email.__dict__})
+
+
+@router.put("/{email_id}", response_model=EmailResponse)
+async def update_email(
+    email_id: str,
+    request: UpdateEmailRequest,
+    current_user: UserDTO = Depends(get_current_user)
+) -> EmailResponse:
+    """Update an email"""
+    container = get_container()
+    use_case = container.update_email_use_case()
+    
+    # First get the email to check ownership
+    get_use_case = container.get_email_use_case()
+    existing_email = await get_use_case.execute(email_id)
+    
+    if existing_email.account_owner != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to update this email"
+        )
+    
+    dto = UpdateEmailDTO(
+        subject=request.subject,
+        recipients=request.recipients,
+        cc=request.cc,
+        bcc=request.bcc,
+        content=request.content,
+        content_type=request.content_type,
+        status=request.status,
+        priority=request.priority,
+        category=request.category,
+        metadata=request.metadata
+    )
+    
+    email = await use_case.execute(email_id, dto)
+    
+    return EmailResponse(**{**email.__dict__})
+
+
+@router.delete("/{email_id}")
+async def delete_email(
+    email_id: str,
+    current_user: UserDTO = Depends(get_current_user)
 ) -> dict:
-    """
-    Get a single email by its ID. Only accessible if the user is a sender or recipient.
-    """
-    try:
-        email_dto = await use_case.execute(email_id)
-        # Only allow access if the user is a sender or recipient
-        if (current_user.email != email_dto.sender and
-            current_user.email not in email_dto.recipients):
+    """Delete an email"""
+    container = get_container()
+    use_case = container.delete_email_use_case()
+    
+    # First get the email to check ownership
+    get_use_case = container.get_email_use_case()
+    existing_email = await get_use_case.execute(email_id)
+    
+    if existing_email.account_owner != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to delete this email"
+        )
+    
+    success = await use_case.execute(email_id)
+    
+    if success:
+        return {"success": True, "message": "Email deleted successfully"}
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found"
+        )
+
+
+@router.post("/send", response_model=SendEmailResponse)
+async def send_email(
+    request: SendEmailRequest,
+    current_user: UserDTO = Depends(get_current_user)
+) -> SendEmailResponse:
+    """Send a new email"""
+    container = get_container()
+    use_case = container.send_new_email_use_case()
+    
+    result = await use_case.execute(
+        subject=request.subject,
+        content=request.content,
+        recipients=request.recipients,
+        cc=request.cc,
+        bcc=request.bcc,
+        sender_email=current_user.email,  # Use current user's email as sender
+        content_type=request.content_type,
+        priority=request.priority
+    )
+    
+    return SendEmailResponse(
+        success=result["success"],
+        message=result["message"],
+        email_id=result.get("email_id"),
+        sent_at=result.get("sent_at")
+    )
+
+
+@router.post("/{email_id}/summarize", response_model=EmailSummaryResponse)
+async def summarize_email(
+    email_id: str,
+    current_user: UserDTO = Depends(get_current_user)
+) -> EmailSummaryResponse:
+    """Summarize a specific email"""
+    container = get_container()
+    use_case = container.summarize_email_use_case()
+    
+    # First get the email to check ownership
+    get_use_case = container.get_email_use_case()
+    existing_email = await get_use_case.execute(email_id)
+    
+    if existing_email.account_owner != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to summarize this email"
+        )
+    
+    result = await use_case.execute(email_id)
+    
+    return EmailSummaryResponse(
+        success=result["success"],
+        message=result["message"],
+        summary=result.get("summary"),
+        sentiment=result.get("sentiment"),
+        key_points=result.get("key_points"),
+        action_items=result.get("action_items")
+    )
+
+
+@router.post("/summarize-multiple", response_model=List[EmailSummaryResponse])
+async def summarize_multiple_emails(
+    email_ids: List[str],
+    current_user: UserDTO = Depends(get_current_user)
+) -> List[EmailSummaryResponse]:
+    """Summarize multiple emails"""
+    container = get_container()
+    use_case = container.summarize_multiple_emails_use_case()
+    
+    # Check ownership for all emails
+    get_use_case = container.get_email_use_case()
+    for email_id in email_ids:
+        existing_email = await get_use_case.execute(email_id)
+        if existing_email.account_owner != current_user.email:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail={"error": "FORBIDDEN", "message": "Access denied to this email"}
+                detail=f"You don't have permission to summarize email {email_id}"
             )
-        return _dto_to_response(email_dto)
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
+    
+    results = await use_case.execute(email_ids)
+    
+    return [
+        EmailSummaryResponse(
+            success=result["success"],
+            message=result["message"],
+            summary=result.get("summary"),
+            sentiment=result.get("sentiment"),
+            key_points=result.get("key_points"),
+            action_items=result.get("action_items")
         )
+        for result in results
+    ]

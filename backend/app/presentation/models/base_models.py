@@ -17,13 +17,20 @@ class ErrorResponse(BaseModel):
     timestamp: datetime = datetime.utcnow()
 
 
+class PaginationParams(BaseModel):
+    """Pagination parameters model"""
+    page: int = 1
+    page_size: int = 50
+    offset: int = 0
+
+
 class PaginationResponse(BaseModel):
     """Pagination response model"""
     page: int
     page_size: int
     total_count: int
     has_next: bool
-    has_previous: bool
+    has_prev: bool
 
 
 class SuccessResponse(BaseModel):

@@ -173,6 +173,7 @@
             border-radius: 10px;
             margin: 15px 0;
             border: 1px solid #c3e6cb;
+            white-space: pre-line;
         }
 
         .status-indicator {
@@ -265,9 +266,22 @@
                 <label>Login Time:</label>
                 <span id="login-time">-</span>
             </div>
+            <div class="user-detail">
+                <label>Connected Accounts:</label>
+                <span id="connected-accounts">-</span>
+            </div>
             <div style="text-align: center;">
                 <button class="logout-btn" onclick="logout()">
                     🚪 Logout
+                </button>
+                <button class="google-btn" onclick="testAddAnotherAccount()" style="margin-top: 10px; background: #28a745;">
+                    ➕ Add Another Account
+                </button>
+                <button class="google-btn" onclick="testFetchEmailsByAccount()" style="margin-top: 10px; background: #17a2b8;">
+                    📧 Test Fetch by Account
+                </button>
+                <button class="google-btn" onclick="testUserAccounts()" style="margin-top: 10px; background: #6f42c1;">
+                    👤 Test User Accounts
                 </button>
             </div>
         </div>
@@ -304,6 +318,17 @@
         // Check for auth success/error parameters in URL
         function checkAuthParams() {
             const urlParams = new URLSearchParams(window.location.search);
+            
+            // Check if this is a return from add another account flow
+            const isAddAccountFlow = urlParams.get('flow') === 'add_account' && 
+                                   urlParams.get('code') && 
+                                   urlParams.get('state');
+            
+            if (isAddAccountFlow) {
+                // Handle add another account OAuth callback
+                handleAddAnotherAccountCallback(urlParams);
+                return;
+            }
             
             if (urlParams.get('status') === 'success') {
                 // Authentication successful
@@ -412,6 +437,9 @@
 
             document.getElementById('user-info').style.display = 'block';
             document.getElementById('login-section').style.display = 'none';
+            
+            // Fetch connected accounts information
+            fetchConnectedAccounts();
         }
 
         // Show login section
@@ -451,6 +479,278 @@
         function hideMessages() {
             document.getElementById('error-message').style.display = 'none';
             document.getElementById('success-message').style.display = 'none';
+        }
+
+        // Handle add another account OAuth callback
+        async function handleAddAnotherAccountCallback(urlParams) {
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+            const redirectSessionId = urlParams.get('session_id');
+            
+            // Clean URL first
+            window.history.replaceState({}, document.title, window.location.pathname);
+            
+            if (error) {
+                showError(`Add Another Account Error (${error}): ${urlParams.get('message') || 'OAuth flow failed'}`);
+                return;
+            }
+            
+            // Use the session ID from redirect if available, otherwise use current session
+            const currentSessionId = redirectSessionId || sessionId;
+            
+            if (!currentSessionId) {
+                showError('No active session found. Please log in first.');
+                return;
+            }
+            
+            showLoading(true);
+            hideMessages();
+            
+            try {
+                const response = await fetch(`${API_BASE}/oauth/add-another-account`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentSessionId}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        state: state
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const accountAdded = data.account_added;
+                    const emailImport = data.email_import;
+                    
+                    let message = `Successfully added account: ${accountAdded.email}`;
+                    if (emailImport && emailImport.success) {
+                        message += `\nImported ${emailImport.emails_imported} emails`;
+                        if (emailImport.emails_summarized) {
+                            message += ` (${emailImport.emails_summarized} summarized)`;
+                        }
+                    }
+                    
+                    showSuccess(message);
+                    
+                    // Refresh connected accounts information
+                    setTimeout(() => {
+                        fetchConnectedAccounts();
+                    }, 1000);
+                } else {
+                    throw new Error(data.message || data.error || 'Failed to add another account');
+                }
+            } catch (error) {
+                showError('Failed to add another account: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Fetch connected accounts information
+        async function fetchConnectedAccounts() {
+            if (!sessionId) {
+                return;
+            }
+
+            try {
+                // First try to get user accounts from the new endpoint
+                const accountsResponse = await fetch(`${API_BASE}/user-accounts/`, {
+                    headers: {
+                        'Authorization': `Bearer ${sessionId}`
+                    }
+                });
+
+                if (accountsResponse.ok) {
+                    const accountsData = await accountsResponse.json();
+                    const accounts = accountsData.accounts || [];
+                    
+                    if (accounts.length > 0) {
+                        const accountEmails = accounts.map(account => {
+                            const status = account.is_primary ? ' (Primary)' : '';
+                            return `${account.email}${status}`;
+                        });
+                        document.getElementById('connected-accounts').textContent = 
+                            `Connected Accounts: ${accountEmails.join(', ')}`;
+                    } else {
+                        document.getElementById('connected-accounts').textContent = 'No accounts found';
+                    }
+                } else {
+                    // Fallback to old method using emails
+                    const response = await fetch(`${API_BASE}/emails?limit=1`, {
+                        headers: {
+                            'Authorization': `Bearer ${sessionId}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const emails = data.emails || [];
+                        
+                        // Extract unique account owners and email holders
+                        const accountOwners = new Set();
+                        const emailHolders = new Set();
+                        
+                        emails.forEach(email => {
+                            if (email.account_owner) accountOwners.add(email.account_owner);
+                            if (email.email_holder) emailHolders.add(email.email_holder);
+                        });
+                        
+                        // Display connected accounts info
+                        const accountsInfo = [];
+                        if (accountOwners.size > 0) {
+                            accountsInfo.push(`Account Owner: ${Array.from(accountOwners).join(', ')}`);
+                        }
+                        if (emailHolders.size > 0) {
+                            accountsInfo.push(`Email Holders: ${Array.from(emailHolders).join(', ')}`);
+                        }
+                        
+                        document.getElementById('connected-accounts').textContent = 
+                            accountsInfo.length > 0 ? accountsInfo.join(' | ') : 'No accounts found';
+                    }
+                }
+            } catch (error) {
+                console.log('Failed to fetch connected accounts:', error);
+                document.getElementById('connected-accounts').textContent = 'Error fetching accounts';
+            }
+        }
+
+        // Test add another account functionality
+        async function testAddAnotherAccount() {
+            if (!sessionId) {
+                showError('No active session to add another account. Please log in first.');
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+
+            try {
+                // First, get the OAuth URL for adding another account
+                const response = await fetch(`${API_BASE}/oauth/add-another-account/initiate`, {
+                    headers: {
+                        'Authorization': `Bearer ${sessionId}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success message and redirect to Google OAuth
+                    showSuccess('Redirecting to Google OAuth to add another account...');
+                    setTimeout(() => {
+                        window.location.href = data.authorization_url;
+                    }, 1000);
+                } else {
+                    throw new Error(data.detail?.message || 'Failed to get OAuth URL for adding another account');
+                }
+            } catch (error) {
+                showError('Failed to initiate add another account: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Test fetch emails by account functionality
+        async function testFetchEmailsByAccount() {
+            if (!sessionId) {
+                showError('No active session to test fetch by account. Please log in first.');
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+
+            try {
+                // Get user's email from the displayed info
+                const userEmail = document.getElementById('user-email').textContent;
+                if (userEmail === '-') {
+                    showError('User email not available. Please log in first.');
+                    return;
+                }
+
+                // Test fetching emails for the user's own account
+                const response = await fetch(`${API_BASE}/emails/fetch-by-account`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${sessionId}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: userEmail
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const emailCount = data.emails ? data.emails.length : 0;
+                    showSuccess(`Successfully fetched emails for account ${userEmail}\nEmails found: ${emailCount}\nTotal count: ${data.total_count}`);
+                    
+                    // Display first few emails if any
+                    if (data.emails && data.emails.length > 0) {
+                        const emailList = data.emails.slice(0, 3).map(email => 
+                            `- ${email.subject} (${email.sender})`
+                        ).join('\n');
+                        showSuccess(`Successfully fetched emails for account ${userEmail}\nEmails found: ${emailCount}\nTotal count: ${data.total_count}\n\nFirst few emails:\n${emailList}`);
+                    }
+                } else {
+                    throw new Error(data.detail?.message || 'Failed to fetch emails by account');
+                }
+            } catch (error) {
+                showError('Failed to fetch emails by account: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Test user accounts functionality
+        async function testUserAccounts() {
+            if (!sessionId) {
+                showError('No active session to test user accounts. Please log in first.');
+                return;
+            }
+
+            showLoading(true);
+            hideMessages();
+
+            try {
+                // Test fetching user accounts
+                const response = await fetch(`${API_BASE}/user-accounts/`, {
+                    headers: {
+                        'Authorization': `Bearer ${sessionId}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const accountCount = data.accounts ? data.accounts.length : 0;
+                    let message = `User Accounts Found: ${accountCount}\n\n`;
+                    
+                    if (data.accounts && data.accounts.length > 0) {
+                        const accountList = data.accounts.map(account => {
+                            const status = account.is_primary ? ' (Primary)' : ' (Secondary)';
+                            const active = account.is_active ? 'Active' : 'Inactive';
+                            return `- ${account.email}${status} - ${active}`;
+                        }).join('\n');
+                        message += `Accounts:\n${accountList}`;
+                    } else {
+                        message += 'No accounts found. This might be a new user or accounts not properly set up.';
+                    }
+                    
+                    showSuccess(message);
+                } else {
+                    throw new Error(data.detail?.message || 'Failed to fetch user accounts');
+                }
+            } catch (error) {
+                showError('Failed to fetch user accounts: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
         }
     </script>
 </body>

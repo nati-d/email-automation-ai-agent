@@ -4,16 +4,13 @@ A FastAPI backend application for the Email Agent project.
 
 ## Features
 
-- **FastAPI Framework**: Modern, fast web framework for building APIs
-- **Async Support**: Built with async/await for high performance
-- **CORS Enabled**: Cross-Origin Resource Sharing configured for frontend integration
-- **Environment Configuration**: Flexible configuration using environment variables
-- **Health Checks**: Built-in health monitoring endpoints
-- **Modular Structure**: Organized codebase with separation of concerns
-- **Google OAuth Integration**: Secure authentication with Google accounts
 - **Email Management**: Send, receive, and manage emails
-- **AI-Powered Email Summarization**: Automatic email analysis using Google Gemini AI
-- **Bearer Token Authentication**: Secure API access with session-based tokens
+- **AI-Powered Summarization**: Automatic email summarization using Google Gemini
+- **Email Categorization**: Intelligent categorization of emails as inbox or tasks
+- **OAuth Authentication**: Secure Google OAuth integration
+- **Multiple Account Support**: Add multiple email accounts to a single user account
+- **Email Categories**: User-defined categories for inbox organization
+- **Real-time Processing**: Asynchronous email processing and AI analysis
 
 ## Project Structure
 
