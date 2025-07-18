@@ -71,6 +71,9 @@ def _dto_to_response(dto: EmailDTO) -> dict:
         "created_at": dto.created_at,
         "updated_at": dto.updated_at,
         "metadata": dto.metadata,
+        # Account ownership fields
+        "account_owner": dto.account_owner,
+        "email_holder": dto.email_holder,
         # AI Summarization fields
         "summary": dto.summary,
         "main_concept": dto.main_concept,
@@ -114,7 +117,7 @@ async def get_my_emails(
     - session_id query parameter
     """
     try:
-        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
         email_responses = [_dto_to_response(email_dto) for email_dto in dto.emails]
         return EmailListResponse(
             emails=email_responses,
@@ -304,9 +307,8 @@ async def get_task_emails(
     Requires a valid session ID as Bearer token in Authorization header.
     """
     try:
-        # For now, we'll filter by email_type in the response
-        # In the future, we can add a specific use case for task emails
-        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        # Filter by account owner and then filter for task emails
+        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
         
         # Filter for task emails
         task_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "tasks"]
@@ -344,9 +346,8 @@ async def get_inbox_emails(
     Requires a valid session ID as Bearer token in Authorization header.
     """
     try:
-        # For now, we'll filter by email_type in the response
-        # In the future, we can add a specific use case for inbox emails
-        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        # Filter by account owner and then filter for inbox emails
+        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
         
         # Filter for inbox emails
         inbox_emails = [email_dto for email_dto in dto.emails if email_dto.email_type == "inbox"]
@@ -385,10 +386,10 @@ async def get_emails_by_category(
     Requires a valid session ID as Bearer token in Authorization header.
     """
     try:
-        # Get all emails and filter by category
-        dto = await use_case.execute(recipient=current_user.email, limit=limit)
+        # Filter by account owner and then filter for category
+        dto = await use_case.execute(account_owner=current_user.email, limit=limit)
         
-        # Filter for inbox emails with the specified category
+        # Filter for inbox emails with specific category
         category_emails = [
             email_dto for email_dto in dto.emails 
             if email_dto.email_type == "inbox" and email_dto.category == category_name

@@ -133,6 +133,9 @@ class GmailService:
                 html_body=body_html,
                 status=EmailStatus.SENT,  # Gmail emails are already sent
                 sent_at=email_date,
+                # Account ownership fields
+                account_owner=str(user_email),  # The logged-in user's email
+                email_holder=str(user_email),   # The email account that holds these emails
                 metadata={
                     'gmail_id': gmail_msg.get('id'),
                     'gmail_thread_id': gmail_msg.get('threadId'),

@@ -35,6 +35,11 @@ class EmailRepository(ABC):
         """Find emails by recipient"""
         pass
     
+    @abstractmethod
+    async def find_by_account_owner(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find emails by account owner (logged-in user)"""
+        pass
+    
 
     async def find_by_status(self, status: EmailStatus, limit: int = 50) -> List[Email]:
         """Find emails by status"""

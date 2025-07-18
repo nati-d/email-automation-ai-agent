@@ -27,6 +27,9 @@ class EmailDTO:
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     metadata: Dict[str, Any] = None
+    # Account ownership fields
+    account_owner: Optional[str] = None
+    email_holder: Optional[str] = None
     # AI Summarization fields
     summary: Optional[str] = None
     main_concept: Optional[str] = None
@@ -56,6 +59,9 @@ class CreateEmailDTO:
     html_body: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     metadata: Dict[str, Any] = None
+    # Account ownership fields
+    account_owner: Optional[str] = None
+    email_holder: Optional[str] = None
     
     def __post_init__(self):
         if self.metadata is None:

@@ -16,6 +16,9 @@ class EmailMessage(BaseModel):
     timestamp: Optional[datetime] = None
     status: str = "draft"  # draft, sent, failed
     metadata: Optional[Dict[str, Any]] = None
+    # Account ownership fields
+    account_owner: Optional[str] = None
+    email_holder: Optional[str] = None
 
 
 class EmailService:
@@ -38,6 +41,9 @@ class EmailService:
             "timestamp": email.timestamp or firestore.SERVER_TIMESTAMP,
             "status": email.status,
             "metadata": email.metadata or {},
+            # Account ownership fields
+            "account_owner": email.account_owner,
+            "email_holder": email.email_holder,
             "created_at": firestore.SERVER_TIMESTAMP,
             "updated_at": firestore.SERVER_TIMESTAMP
         }
@@ -71,7 +77,9 @@ class EmailService:
             html_body=data.get("html_body"),
             timestamp=data.get("timestamp"),
             status=data["status"],
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
+            account_owner=data.get("account_owner"),
+            email_holder=data.get("email_holder")
         )
     
     async def get_emails_by_sender(self, sender: str, limit: int = 50) -> List[EmailMessage]:
@@ -96,7 +104,9 @@ class EmailService:
                 html_body=data.get("html_body"),
                 timestamp=data.get("timestamp"),
                 status=data["status"],
-                metadata=data.get("metadata", {})
+                metadata=data.get("metadata", {}),
+                account_owner=data.get("account_owner"),
+                email_holder=data.get("email_holder")
             ))
         
         return emails

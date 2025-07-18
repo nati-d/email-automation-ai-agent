@@ -43,6 +43,9 @@ class Email(BaseEntity):
     scheduled_at: Optional[datetime] = None
     sent_at: Optional[datetime] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    # Account ownership fields
+    account_owner: Optional[str] = None  # Email of the logged-in user who owns this email account
+    email_holder: Optional[str] = None   # Email address of the account that actually holds these emails
     # AI Summarization fields
     summary: Optional[str] = None
     main_concept: Optional[str] = None

@@ -40,6 +40,9 @@ class EmailUseCaseBase:
             created_at=email.created_at,
             updated_at=email.updated_at,
             metadata=email.metadata,
+            # Account ownership fields
+            account_owner=email.account_owner,
+            email_holder=email.email_holder,
             # AI Summarization fields
             summary=email.summary,
             main_concept=email.main_concept,
@@ -63,7 +66,10 @@ class EmailUseCaseBase:
             subject=dto.subject,
             body=dto.body,
             html_body=dto.html_body,
-            metadata=dto.metadata
+            metadata=dto.metadata,
+            # Account ownership fields
+            account_owner=dto.account_owner,
+            email_holder=dto.email_holder
         )
         
         if dto.scheduled_at:
@@ -78,6 +84,13 @@ class CreateEmailUseCase(EmailUseCaseBase):
     async def execute(self, dto: CreateEmailDTO) -> EmailDTO:
         """Create a new email"""
         email = self._dto_to_entity(dto)
+        
+        # Set account ownership if not provided
+        if not email.account_owner:
+            email.account_owner = dto.sender
+        if not email.email_holder:
+            email.email_holder = dto.sender
+        
         saved_email = await self.email_repository.save(email)
         return self._entity_to_dto(saved_email)
 
@@ -180,7 +193,10 @@ class SendNewEmailUseCase(EmailUseCaseBase):
             recipients=recipient_addresses,
             subject=subject,
             body=body,
-            html_body=html_body
+            html_body=html_body,
+            # Account ownership fields
+            account_owner=sender_email,  # The sender is the account owner
+            email_holder=sender_email    # The sender's email account holds this email
         )
         
         # Save email first
@@ -273,13 +289,17 @@ class ListEmailsUseCase(EmailUseCaseBase):
         self, 
         sender: Optional[str] = None,
         recipient: Optional[str] = None,
+        account_owner: Optional[str] = None,
         status: Optional[str] = None,
         limit: int = 50
     ) -> EmailListDTO:
         """List emails with optional filters"""
         emails = []
         
-        if recipient:
+        if account_owner:
+            # Filter by account owner (logged-in user)
+            emails = await self.email_repository.find_by_account_owner(account_owner, limit)
+        elif recipient:
             recipient_email = EmailAddress.create(recipient)
             emails = await self.email_repository.find_by_recipient(recipient_email, limit)
         elif sender:
@@ -298,7 +318,7 @@ class ListEmailsUseCase(EmailUseCaseBase):
             total_count=len(email_dtos),
             page=1,
             page_size=limit
-        ) 
+        )
 
 
 class FetchInitialEmailsUseCase(EmailUseCaseBase):

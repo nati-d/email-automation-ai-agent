@@ -79,6 +79,19 @@ class EmailResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     metadata: Dict[str, Any] = {}
+    # Account ownership fields
+    account_owner: Optional[str] = None
+    email_holder: Optional[str] = None
+    # AI Summarization fields
+    summary: Optional[str] = None
+    main_concept: Optional[str] = None
+    sentiment: Optional[str] = None
+    key_topics: List[str] = []
+    summarized_at: Optional[datetime] = None
+    # Email categorization
+    email_type: str = "inbox"
+    category: Optional[str] = None
+    categorized_at: Optional[datetime] = None
     
     class Config:
         json_schema_extra = {

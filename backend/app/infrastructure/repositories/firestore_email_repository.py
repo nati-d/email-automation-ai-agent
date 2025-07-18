@@ -35,6 +35,9 @@ class FirestoreEmailRepository(EmailRepository):
             "created_at": email.created_at,
             "updated_at": email.updated_at,
             "metadata": email.metadata,
+            # Account ownership fields
+            "account_owner": email.account_owner,
+            "email_holder": email.email_holder,
             # AI Summarization fields
             "summary": email.summary,
             "main_concept": email.main_concept,
@@ -62,6 +65,9 @@ class FirestoreEmailRepository(EmailRepository):
             scheduled_at=doc_data.get("scheduled_at"),
             sent_at=doc_data.get("sent_at"),
             metadata=doc_data.get("metadata", {}),
+            # Account ownership fields
+            account_owner=doc_data.get("account_owner"),
+            email_holder=doc_data.get("email_holder"),
             # AI Summarization fields
             summary=doc_data.get("summary"),
             main_concept=doc_data.get("main_concept"),
@@ -128,6 +134,16 @@ class FirestoreEmailRepository(EmailRepository):
             emails.append(self._doc_to_entity(doc.id, doc.to_dict()))
         
         return emails
+    
+    async def find_by_account_owner(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find emails by account owner (logged-in user)"""
+        query = self.db.collection(self.collection_name)\
+            .where("account_owner", "==", account_owner)\
+            .order_by("created_at", direction=firestore.Query.DESCENDING)\
+            .limit(limit)
+        
+        docs = query.stream()
+        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
     
 
     
