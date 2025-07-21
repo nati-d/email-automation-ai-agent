@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { AppSidebar } from "@/components/AppSidebar";
+import { formatEmailDate } from "../lib/utils";
 
 // Define User type locally
 interface User {
@@ -20,6 +21,25 @@ interface User {
 
 interface Email extends BaseEmail {
   label?: string;
+  category?: string;
+  sentiment?: string;
+  main_concept?: string;
+  key_topics?: string[];
+  summary?: string;
+  sent_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  scheduled_at?: string;
+  summarized_at?: string;
+  categorized_at?: string;
+  email_type?: string;
+  status?: string;
+  body?: string;
+  html_body?: string;
+  recipients?: string[];
+  account_owner?: string;
+  email_holder?: string;
+  metadata?: Record<string, any>;
 }
 
 const TABS = [
@@ -48,7 +68,9 @@ export default function Home() {
     if (user) {
       setLoading(true)
       fetchEmails()
-        .then(setEmails)
+        .then((data) => {
+          setEmails(data);
+        })
         .catch((err) => setError(err.message || "Failed to fetch emails"))
         .finally(() => setLoading(false))
     }
@@ -132,7 +154,6 @@ export default function Home() {
             <StarOff className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
           </span>
           <span className="flex-1">From</span>
-          <span className="w-32">Label</span>
           <span className="flex-[2]">Subject</span>
           <span className="w-20 text-right">Date</span>
         </div>
@@ -143,32 +164,72 @@ export default function Home() {
           {error && <div className="text-[var(--destructive)] p-8">{error}</div>}
           {!loading && !error && filteredEmails.length === 0 && <div className="text-[var(--muted-foreground)] p-8">No emails found.</div>}
           <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {filteredEmails.map((email) => (
-              <li
-                key={email.id}
-                className={`flex items-center px-6 py-3 hover:bg-[var(--muted)] transition-colors cursor-pointer text-sm
-              ${email.read ? '' : 'font-bold'}`}
-                style={{ background: email.read ? 'var(--card)' : 'var(--accent-foreground)', color: 'var(--foreground)' }}
-              >
-                <input type="checkbox" className="accent-[var(--primary)] w-4 h-4 mr-4" />
-                <button onClick={() => toggleStar(email.id)} className="w-6 mr-2 flex items-center justify-center">
-                  {starred[email.id] ? (
-                    <Star className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                  ) : (
-                    <StarOff className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
-                  )}
-                </button>
-                <span className="flex-1 truncate">{email.sender}</span>
-                <span className="w-32 truncate" style={{ color: 'var(--muted-foreground)' }}>{email.label || "Client work"}</span>
-                <span className="flex-[2] truncate">
-                  {email.subject} <span className="text-[var(--muted-foreground)] font-normal">- {email.snippet}</span>
-                </span>
-                <span className="w-20 text-right flex items-center justify-end gap-1" style={{ color: 'var(--muted-foreground)' }}>
-                  {new Date(email.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                  {!email.read && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}
-                </span>
-              </li>
-            ))}
+            {filteredEmails.map((email) => {
+              return (
+                <li
+                  key={email.id}
+                  className={`flex flex-col px-6 py-3 hover:bg-[var(--muted)] transition-colors cursor-pointer text-sm ${email.read ? '' : 'font-bold'}`}
+                  style={{ background: email.read ? 'var(--card)' : 'var(--accent-foreground)', color: 'var(--foreground)' }}
+                >
+                  <div className="flex items-center w-full">
+                    <input type="checkbox" className="accent-[var(--primary)] w-4 h-4 mr-4" />
+                    <button onClick={() => toggleStar(email.id)} className="w-6 mr-2 flex items-center justify-center">
+                      {starred[email.id] ? (
+                        <Star className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+                      ) : (
+                        <StarOff className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
+                      )}
+                    </button>
+                    <span className="flex-1 truncate">{email.sender}</span>
+                    <span className="flex-[2] truncate">
+                      {email.subject} <span className="text-[var(--muted-foreground)] font-normal">- {email.snippet}</span>
+                    </span>
+                    <span className="w-20 text-right flex items-center justify-end gap-1" style={{ color: 'var(--muted-foreground)' }}>
+                      {formatEmailDate(email.sent_at || email.created_at || email.updated_at)}
+                      {!email.read && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}
+                    </span>
+                  </div>
+                  {/* AI Insights Bar */}
+                  <div className="flex flex-wrap items-center gap-2 mt-1 pl-12">
+                    {/* Sentiment Dot */}
+                    {email.sentiment && (
+                      <span
+                        className="w-2 h-2 rounded-full inline-block"
+                        style={{
+                          background:
+                            email.sentiment === 'positive'
+                              ? '#22c55e'
+                              : email.sentiment === 'negative'
+                              ? '#ef4444'
+                              : email.sentiment === 'neutral'
+                              ? '#facc15'
+                              : 'var(--muted-foreground)',
+                        }}
+                        title={email.sentiment.charAt(0).toUpperCase() + email.sentiment.slice(1)}
+                      />
+                    )}
+                    {/* Main Concept Badge */}
+                    {email.main_concept && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-semibold" style={{ background: 'var(--accent)', color: 'var(--accent-foreground)' }}>
+                        {email.main_concept}
+                      </span>
+                    )}
+                    {/* Key Topics Chips */}
+                    {email.key_topics && Array.isArray(email.key_topics) && email.key_topics.slice(0, 3).map((topic) => (
+                      <span key={topic} className="px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)' }}>
+                        #{topic}
+                      </span>
+                    ))}
+                    {/* AI Summary */}
+                    {email.summary && (
+                      <span className="text-xs text-[var(--muted-foreground)] ml-2 truncate max-w-[60%]" title={email.summary}>
+                        {email.summary}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </main>
       </div>
