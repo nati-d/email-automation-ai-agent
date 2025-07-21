@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { saveUserToStorage } from '../../lib/auth';
+import { saveUserToStorage } from '../../lib/api/auth';
 
 export default function AuthSuccessPage() {
   const router = useRouter();

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { LogIn, Info, Sparkles } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
-import { getGoogleAuthUrl } from '../lib/auth';
+import { getGoogleAuthUrl } from '../lib/api/auth'; // updated path
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
