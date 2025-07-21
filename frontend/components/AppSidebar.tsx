@@ -36,6 +36,8 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { fetchCategories, Category } from "@/lib/api/categories"
+import { useApp } from "./AppContext"
 
 // Define User type locally for now
 interface User {
@@ -55,18 +57,12 @@ const SIDEBAR_ITEMS = [
   { label: "Important", icon: Tag, count: 0, href: "#" },
 ]
 
-const CATEGORIES = [
-  { label: "Social", color: "bg-blue-500", count: 5000 },
-  { label: "Promotions", color: "bg-green-500", count: 200 },
-  { label: "Updates", color: "bg-indigo-500", count: 122 },
-  { label: "Updates", color: "bg-indigo-500", count: 122 },
-  { label: "Updates", color: "bg-indigo-500", count: 122 },
-  { label: "Updates", color: "bg-indigo-500", count: 122 },
-]
-
 export function AppSidebar() {
   const { toggleSidebar } = useSidebar()
+  const { currentCategory, setCurrentCategory } = useApp()
   const [user, setUser] = React.useState<User | null>(null)
+  const [categories, setCategories] = React.useState<Category[]>([])
+  const [loading, setLoading] = React.useState(true)
 
   React.useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -75,6 +71,31 @@ export function AppSidebar() {
     }
   }, [])
 
+  React.useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoading(true)
+        const categoriesData = await fetchCategories()
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error("Failed to fetch categories:", error)
+        setCategories([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadCategories()
+  }, [])
+
+  const handleCategoryClick = (categoryName: string) => {
+    setCurrentCategory(categoryName)
+  }
+
+  const handleInboxClick = () => {
+    setCurrentCategory(null) // Clear category filter to show all emails
+  }
+
   function handleLogout() {
     localStorage.removeItem("user")
     window.location.reload()
@@ -82,7 +103,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      className=" w-60 min-w-0 max-w-full overflow-x-hidden "
+      className="border-r w-60 min-w-0 max-w-full overflow-x-hidden "
       style={{
         background: 'var(--sidebar)',
         color: 'var(--sidebar-foreground)',
@@ -110,11 +131,11 @@ export function AppSidebar() {
               <SidebarMenuItem key={label}>
                 <SidebarMenuButton
                   asChild
-                  isActive={active}
-                  className={active ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
-                  style={active ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
+                  isActive={active && !currentCategory}
+                  className={active && !currentCategory ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
+                  style={active && !currentCategory ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
                 >
-                  <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate">
+                  <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate" onClick={label === "Inbox" ? handleInboxClick : undefined}>
                     <span className="flex items-center gap-2 truncate">
                       <Icon className="w-5 h-5 shrink-0" />
                       <span className="truncate">{label}</span>
@@ -144,21 +165,75 @@ export function AppSidebar() {
             <CollapsibleContent>
               <SidebarGroupContent className="mt-2">
                 <SidebarMenu>
-                  {CATEGORIES.map(({ label, color, count }) => (
-                    <SidebarMenuItem key={label}>
-                      <SidebarMenuButton asChild>
-                        <Link href="#" className="flex items-center w-full max-w-full justify-between gap-2 truncate">
-                          <span className="flex items-center gap-2 truncate">
-                            <span className={`w-2 h-2 rounded-full ${color}`} />
-                            <span className="truncate">{label}</span>
-                          </span>
-                          <span className="ml-auto bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 text-xs font-semibold truncate max-w-[48px] text-ellipsis overflow-hidden">
-                            {count.toLocaleString()}
-                          </span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {loading ? (
+                    <div className="px-2 py-2 text-xs text-zinc-500">Loading categories...</div>
+                  ) : (
+                    <>
+                      {/* All category - always show */}
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={!currentCategory}
+                          className={!currentCategory ? 'bg-[color:var(--sidebar-accent)]/20 text-[color:var(--primary)] font-medium' : 'hover:bg-[color:var(--sidebar-accent)]/10'}
+                          style={!currentCategory ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
+                        >
+                          <Link 
+                            href="#" 
+                            className="flex items-center w-full max-w-full justify-between gap-2 truncate"
+                            onClick={() => handleCategoryClick('')}
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <span 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ background: '#6b7280' }}
+                              />
+                              <span className="truncate">All</span>
+                            </span>
+                            <span className="ml-auto bg-gray-100 text-gray-700 rounded-full px-2 py-0.5 text-xs font-semibold truncate max-w-[48px] text-ellipsis overflow-hidden">
+                              All
+                            </span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      
+                      {categories.length > 0 ? (
+                        categories.map((category) => {
+                          const isActive = currentCategory === category.name
+                          return (
+                            <SidebarMenuItem key={category.id}>
+                              <SidebarMenuButton
+                                asChild
+                                isActive={isActive}
+                                className={isActive ? 'bg-[color:var(--sidebar-accent)]/20 text-[color:var(--primary)] font-medium' : 'hover:bg-[color:var(--sidebar-accent)]/10'}
+                                style={isActive ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
+                              >
+                                <Link 
+                                  href="#" 
+                                  className="flex items-center w-full max-w-full justify-between gap-2 truncate"
+                                  onClick={() => handleCategoryClick(category.name || '')}
+                                >
+                                  <span className="flex items-center gap-2 truncate">
+                                    <span 
+                                      className="w-2 h-2 rounded-full" 
+                                      style={{ background: category.color || '#3b82f6' }}
+                                    />
+                                    <span className="truncate">{category.name}</span>
+                                  </span>
+                                  {category.count && (
+                                    <span className="ml-auto bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 text-xs font-semibold truncate max-w-[48px] text-ellipsis overflow-hidden">
+                                      {category.count.toLocaleString()}
+                                    </span>
+                                  )}
+                                </Link>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          )
+                        })
+                      ) : (
+                        <div className="px-2 py-2 text-xs text-zinc-500">No categories found</div>
+                      )}
+                    </>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </CollapsibleContent>

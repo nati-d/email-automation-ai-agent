@@ -17,6 +17,8 @@ interface AppContextType {
   setUser: (user: User | null) => void;
   search: string;
   setSearch: (search: string) => void;
+  currentCategory: string | null;
+  setCurrentCategory: (category: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -24,6 +26,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [search, setSearch] = useState("")
+  const [currentCategory, setCurrentCategory] = useState<string | null>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -33,7 +36,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ user, setUser, search, setSearch }}>
+    <AppContext.Provider value={{ user, setUser, search, setSearch, currentCategory, setCurrentCategory }}>
       {children}
     </AppContext.Provider>
   )

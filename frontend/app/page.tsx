@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchEmails, type Email as BaseEmail } from "../lib/api/email";
+import { fetchEmails, fetchEmailsByCategory, type Email as BaseEmail } from "../lib/api/email";
 import { Star, StarOff, Mail, UserIcon, Tag, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../lib/utils";
@@ -38,7 +38,7 @@ const TABS = [
 ]
 
 export default function Home() {
-  const { user, search } = useApp()
+  const { user, search, currentCategory } = useApp()
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,14 +49,24 @@ export default function Home() {
   useEffect(() => {
     if (user) {
       setLoading(true)
-      fetchEmails()
-        .then((data) => {
-          setEmails(data);
-        })
-        .catch((err) => setError(err.message || "Failed to fetch emails"))
-        .finally(() => setLoading(false))
+      const fetchData = async () => {
+        try {
+          let data: Email[]
+          if (currentCategory) {
+            data = await fetchEmailsByCategory(currentCategory)
+          } else {
+            data = await fetchEmails()
+          }
+          setEmails(data)
+        } catch (err: any) {
+          setError(err.message || "Failed to fetch emails")
+        } finally {
+          setLoading(false)
+        }
+      }
+      fetchData()
     }
-  }, [user])
+  }, [user, currentCategory])
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -71,6 +81,18 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-0 w-full min-w-0 h-full overflow-x-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+        {/* Category Header */}
+        {currentCategory && (
+          <div className="flex items-center gap-2 px-6 py-3 bg-card border-b" style={{ borderColor: 'var(--border)' }}>
+            <Tag className="w-4 h-4" style={{ color: 'var(--primary)' }} />
+            <span className="text-sm font-medium text-foreground">
+              Category: {currentCategory}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              ({filteredEmails.length} emails)
+            </span>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-4 px-6 pt-4 pb-2 border-b" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
@@ -109,7 +131,11 @@ export default function Home() {
         <main className="flex-1 overflow-y-auto" style={{ background: 'var(--card)' }}>
           {loading && <div className="text-[var(--muted-foreground)] p-8">Loading emails...</div>}
           {error && <div className="text-[var(--destructive)] p-8">{error}</div>}
-          {!loading && !error && filteredEmails.length === 0 && <div className="text-[var(--muted-foreground)] p-8">No emails found.</div>}
+          {!loading && !error && filteredEmails.length === 0 && (
+            <div className="text-[var(--muted-foreground)] p-8">
+              {currentCategory ? `No emails found in category "${currentCategory}".` : "No emails found."}
+            </div>
+          )}
           <ul className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {filteredEmails.map((email) => {
               return (
