@@ -1,16 +1,15 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { useEmails } from '@/lib/queries'
-import { useEmailStore } from '@/lib/store'
-import { EmailListItem } from './email-list-item'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
+import { useState } from "react";
+import { useInboxEmails, useTaskEmails } from "@/lib/queries";
+import { useEmailStore } from "@/lib/store";
+import { EmailListItem } from "./email-list-item";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Search,
   RefreshCw,
   Archive,
   Trash2,
@@ -18,37 +17,75 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+  CheckSquare,
+  Inbox,
+  Tag,
+} from "lucide-react";
+import { cn } from "@/lib/utils"; // Used in className
 
 interface EmailListProps {
-  onEmailSelect: (emailId: string) => void
-  selectedEmailId?: string
+  onEmailSelect: (emailId: string) => void;
+  selectedEmailId?: string;
+  emailType: string;
 }
 
-export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
-  const [currentPage, setCurrentPage] = useState(1)
-  const { selectedFolder, searchQuery, setSearchQuery, selectedEmails, clearSelection } = useEmailStore()
-  
-  const { data, isLoading, error, refetch } = useEmails(
-    { folder: selectedFolder, search: searchQuery || undefined },
-    50
-  )
+export function EmailList({
+  onEmailSelect,
+  selectedEmailId,
+  emailType,
+}: EmailListProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const { selectedEmails, toggleEmailSelection, clearSelection } =
+    useEmailStore();
+
+  // Use different hooks based on email type
+  const { data, isLoading, error, refetch } =
+    emailType === "tasks" ? useTaskEmails() : useInboxEmails();
+
+  const getFolderIcon = () => {
+    switch (emailType) {
+      case "inbox":
+        return <Inbox className="h-5 w-5" />;
+      case "tasks":
+        return <CheckSquare className="h-5 w-5" />;
+      case "starred":
+        return <Star className="h-5 w-5" />;
+      case "sent":
+        return <Archive className="h-5 w-5" />;
+      case "trash":
+        return <Trash2 className="h-5 w-5" />;
+      default:
+        if (emailType.startsWith("category-")) {
+          return <Tag className="h-5 w-5" />;
+        }
+        return <Inbox className="h-5 w-5" />;
+    }
+  };
+
+  const getFolderTitle = () => {
+    if (emailType.startsWith("category-")) {
+      return (
+        emailType.replace("category-", "").charAt(0).toUpperCase() +
+        emailType.slice(9)
+      );
+    }
+    return emailType.charAt(0).toUpperCase() + emailType.slice(1);
+  };
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setCurrentPage(1)
-  }
+    e.preventDefault();
+    setCurrentPage(1);
+  };
 
   const handleRefresh = () => {
-    refetch()
-  }
+    refetch();
+  };
 
   const handleBulkAction = (action: string) => {
     // TODO: Implement bulk actions
-    console.log(`Bulk action: ${action} on emails:`, selectedEmails)
-    clearSelection()
-  }
+    console.log(`Bulk action: ${action} on emails:`, selectedEmails);
+    clearSelection();
+  };
 
   if (error) {
     return (
@@ -61,25 +98,23 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
           Retry
         </Button>
       </div>
-    )
+    );
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b">
-        <div className="flex items-center gap-2 mb-4">
-          <form onSubmit={handleSearch} className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search emails..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </form>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            {getFolderIcon()}
+            <h2 className="text-lg font-semibold">{getFolderTitle()}</h2>
+            {data && (
+              <Badge variant="secondary" className="ml-2">
+                {data.total_count}
+              </Badge>
+            )}
+          </div>
           <Button variant="outline" size="icon" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -87,14 +122,12 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
 
         {/* Bulk actions */}
         {selectedEmails.length > 0 && (
-          <div className="flex items-center gap-2 mb-2">
-            <Badge variant="secondary">
-              {selectedEmails.length} selected
-            </Badge>
+          <div className="flex items-center gap-2 py-2">
+            <Badge variant="secondary">{selectedEmails.length} selected</Badge>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleBulkAction('archive')}
+              onClick={() => handleBulkAction("archive")}
             >
               <Archive className="mr-1 h-3 w-3" />
               Archive
@@ -102,7 +135,7 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleBulkAction('delete')}
+              onClick={() => handleBulkAction("delete")}
             >
               <Trash2 className="mr-1 h-3 w-3" />
               Delete
@@ -110,7 +143,7 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => handleBulkAction('star')}
+              onClick={() => handleBulkAction("star")}
             >
               <Star className="mr-1 h-3 w-3" />
               Star
@@ -120,16 +153,6 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
             </Button>
           </div>
         )}
-
-        {/* Folder info */}
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span className="capitalize">{selectedFolder}</span>
-          {data && (
-            <span>
-              {data.emails.length} of {data.total_count} emails
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Email list */}
@@ -152,11 +175,15 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
           </div>
         ) : data?.emails.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <div className="text-muted-foreground mb-2">
-              No emails found
+            <div className="w-16 h-16 mb-4 text-muted-foreground">
+              {getFolderIcon()}
+            </div>
+            <div className="text-lg font-medium mb-2">
+              No emails in {getFolderTitle()}
             </div>
             <div className="text-sm text-muted-foreground">
-              {searchQuery ? 'Try adjusting your search terms' : `Your ${selectedFolder} is empty`}
+              Messages that appear here will be shown in your{" "}
+              {getFolderTitle().toLowerCase()}
             </div>
           </div>
         ) : (
@@ -203,5 +230,5 @@ export function EmailList({ onEmailSelect, selectedEmailId }: EmailListProps) {
         </>
       )}
     </div>
-  )
+  );
 }

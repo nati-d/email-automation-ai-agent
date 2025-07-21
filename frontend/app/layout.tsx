@@ -4,6 +4,8 @@ import "./globals.css";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { AuthProvider } from "@/components/providers/auth-provider";
+import { SessionRefreshProvider } from "@/components/providers/session-refresh-provider";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const geistSans = Geist({
@@ -17,8 +19,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Email Agent - AI-Powered Email Management",
-  description: "Manage your emails efficiently with AI-powered automation and smart organization.",
+  title: "Email-Agent - AI-Powered Email Management",
+  description:
+    "Manage your emails efficiently with Email-Agent's AI-powered automation and smart organization.",
 };
 
 export default function RootLayout({
@@ -27,18 +30,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="h-full">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full h-full`}
       >
         <ErrorBoundary>
-          <ThemeProvider
-            defaultTheme="system"
-            storageKey="email-agent-theme"
-          >
+          <ThemeProvider defaultTheme="system" storageKey="email-agent-theme">
             <ToastProvider>
               <QueryProvider>
-                {children}
+                <AuthProvider>
+                  <SessionRefreshProvider>{children}</SessionRefreshProvider>
+                </AuthProvider>
               </QueryProvider>
             </ToastProvider>
           </ThemeProvider>

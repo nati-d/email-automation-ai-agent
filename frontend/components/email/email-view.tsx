@@ -1,11 +1,12 @@
 'use client'
 
-import { useEmail, useMarkAsRead, useStarEmail, useUnstarEmail, useDeleteEmail } from '@/lib/queries'
+import { useEmail, useMarkAsRead, useStarEmail, useUnstarEmail, useDeleteEmail, useSummarizeEmail } from '@/lib/queries'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/providers/toast-provider'
 import {
   Star,
   Reply,
@@ -31,6 +32,8 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
   const starEmail = useStarEmail()
   const unstarEmail = useUnstarEmail()
   const deleteEmail = useDeleteEmail()
+  const summarizeEmail = useSummarizeEmail()
+  const { toast } = useToast()
 
   if (isLoading) {
     return (
@@ -110,6 +113,23 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
             <Button variant="ghost" size="icon" onClick={handleDelete}>
               <Trash2 className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => {
+                summarizeEmail.mutate(email.id, {
+                  onSuccess: () => {
+                    toast.success('Email Summarized', 'AI has analyzed and summarized this email');
+                  },
+                  onError: (error) => {
+                    toast.error('Summarization Failed', error instanceof Error ? error.message : 'Failed to summarize email');
+                  }
+                });
+              }}
+              title="Summarize with AI"
+            >
+              <span className="text-xs font-semibold">AI</span>
+            </Button>
             <Button variant="ghost" size="icon">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
@@ -157,9 +177,6 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
               
               <div className="text-sm text-muted-foreground mb-2">
                 to {email.recipients.join(', ')}
-                {email.cc && email.cc.length > 0 && (
-                  <span> • cc {email.cc.join(', ')}</span>
-                )}
               </div>
               
               <div className="text-xs text-muted-foreground">
@@ -168,31 +185,53 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
             </div>
           </div>
 
-          {/* Attachments */}
-          {email.attachments && email.attachments.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <Paperclip className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {email.attachments.length} attachment{email.attachments.length > 1 ? 's' : ''}
-                </span>
+          {/* Attachments - Removed since Email type doesn't have attachments */}
+
+          {/* AI Insights */}
+          {(email.summary || email.sentiment || email.key_topics || email.main_concept) && (
+            <div className="mb-6 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-md border border-purple-100 dark:border-purple-800/30">
+              <div className="flex items-center mb-2">
+                <Badge className="mr-2 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">AI Insights</Badge>
               </div>
-              <div className="space-y-2">
-                {email.attachments.map((attachment) => (
-                  <div
-                    key={attachment.id}
-                    className="flex items-center gap-2 p-2 border rounded-md"
-                  >
-                    <Paperclip className="h-4 w-4 text-muted-foreground" />
-                    <span className="flex-1 text-sm">{attachment.filename}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {(attachment.size / 1024).toFixed(1)} KB
-                    </span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                      <Download className="h-3 w-3" />
-                    </Button>
+              
+              {email.summary && (
+                <div className="mb-2">
+                  <div className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Summary</div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{email.summary}</p>
+                </div>
+              )}
+              
+              <div className="flex flex-wrap gap-4">
+                {email.main_concept && (
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Main Concept</div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{email.main_concept}</p>
                   </div>
-                ))}
+                )}
+                
+                {email.sentiment && (
+                  <div className="flex-1 min-w-[150px]">
+                    <div className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Sentiment</div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300 capitalize">{email.sentiment}</p>
+                  </div>
+                )}
+                
+                {email.key_topics && email.key_topics.length > 0 && (
+                  <div className="flex-1 min-w-[200px]">
+                    <div className="text-xs font-medium text-purple-700 dark:text-purple-400 mb-1">Key Topics</div>
+                    <div className="flex flex-wrap gap-1">
+                      {Array.isArray(email.key_topics) ? (
+                        email.key_topics.map((topic, index) => (
+                          <Badge key={index} variant="outline" className="text-xs bg-white dark:bg-gray-800">
+                            {topic}
+                          </Badge>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{email.key_topics}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -209,7 +248,7 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
       <Separator />
       <div className="p-4">
         <div className="flex items-center gap-2">
-          <Button>
+          <Button className="bg-purple-500 hover:bg-purple-600 text-white">
             <Reply className="mr-2 h-4 w-4" />
             Reply
           </Button>
@@ -221,6 +260,8 @@ export function EmailView({ emailId, onBack }: EmailViewProps) {
             <Forward className="mr-2 h-4 w-4" />
             Forward
           </Button>
+          
+   
         </div>
       </div>
     </div>

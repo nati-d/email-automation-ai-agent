@@ -54,8 +54,8 @@ export function EmailListItem({ email, isSelected, onClick }: EmailListItemProps
     <div
       className={cn(
         'flex items-start gap-3 p-4 border-b cursor-pointer transition-colors hover:bg-muted/50',
-        isSelected && 'bg-muted',
-        !email.is_read && 'bg-blue-50/50 dark:bg-blue-950/20'
+        isSelected && 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800',
+        !email.is_read && 'bg-purple-50/50 dark:bg-purple-950/20'
       )}
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
@@ -106,8 +106,27 @@ export function EmailListItem({ email, isSelected, onClick }: EmailListItemProps
           {email.subject || '(no subject)'}
         </div>
         
-        <div className="text-xs text-muted-foreground truncate">
-          {truncateText(email.body.replace(/<[^>]*>/g, ''), 100)}
+        <div className="flex items-center gap-2">
+          {email.category && (
+            <Badge className="text-xs px-1.5 py-0.5" style={{
+              backgroundColor: email.color ? `${email.color}20` : '#6366f120',
+              color: email.color || '#6366f1',
+              borderColor: email.color ? `${email.color}30` : '#6366f130'
+            }}>
+              {email.category}
+            </Badge>
+          )}
+          
+          <div className="text-xs text-muted-foreground truncate flex-1">
+            {email.summary ? (
+              <span className="flex items-center">
+                <Badge className="mr-1 h-4 px-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">AI</Badge>
+                {email.summary}
+              </span>
+            ) : (
+              truncateText(email.body.replace(/<[^>]*>/g, ''), 100)
+            )}
+          </div>
         </div>
       </div>
 

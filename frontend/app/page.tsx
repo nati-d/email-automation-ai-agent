@@ -1,10 +1,12 @@
-import { AuthGuard } from "@/components/auth/auth-guard";
-import { EmailLayout } from "@/components/email/email-layout";
+"use client";
 
-export default function Home() {
+import { ProtectedRoute } from "@/components/auth/protected-route";
+import { EmailApp } from "@/components/email/email-app";
+
+export default function RootPage() {
   return (
-    <AuthGuard>
-      <EmailLayout />
-    </AuthGuard>
+    <ProtectedRoute>
+      <EmailApp />
+    </ProtectedRoute>
   );
 }
