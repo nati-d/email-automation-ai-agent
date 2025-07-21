@@ -1,8 +1,14 @@
-'use client';
+"use client"
 
-import { useEffect, useState } from 'react';
-import Image from "next/image";
+import { useEffect, useState } from "react"
+import { fetchEmails, type Email as BaseEmail } from "../lib/api/email";
+import { Search, Bell, MoreHorizontal, Star, StarOff, Mail, UserIcon, Tag, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
+import { AppSidebar } from "@/components/AppSidebar";
 
+// Define User type locally
 interface User {
   name: string;
   email: string;
@@ -12,43 +18,152 @@ interface User {
   profilePicture?: string;
 }
 
+interface Email extends BaseEmail {
+  label?: string;
+}
+
+const TABS = [
+  { label: "Primary", icon: Mail },
+  { label: "Social", icon: UserIcon },
+  { label: "Updates", icon: Tag },
+]
+
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null)
+  const [emails, setEmails] = useState<Email[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
+  const [starred, setStarred] = useState<{ [id: string]: boolean }>({})
+  const [activeTab, setActiveTab] = useState("Primary")
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
+    const stored = localStorage.getItem("user")
     if (stored) {
-      setUser(JSON.parse(stored));
+      setUser(JSON.parse(stored))
     }
-  }, []);
+  }, [])
 
-  function handleLogout() {
-    localStorage.removeItem('user');
-    window.location.reload();
+  useEffect(() => {
+    if (user) {
+      setLoading(true)
+      fetchEmails()
+        .then(setEmails)
+        .catch((err) => setError(err.message || "Failed to fetch emails"))
+        .finally(() => setLoading(false))
+    }
+  }, [user])
+
+  function toggleStar(id: string) {
+    setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
+  const filteredEmails = emails.filter(
+    (email) =>
+      email.subject.toLowerCase().includes(search.toLowerCase()) ||
+      email.sender.toLowerCase().includes(search.toLowerCase()) ||
+      email.snippet.toLowerCase().includes(search.toLowerCase()),
+  )
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        {user ? (
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-8 flex flex-col items-center gap-4 border border-zinc-200 dark:border-zinc-800 min-w-[320px]">
-            {user.profilePicture && (
-              <img src={user.profilePicture} alt="Profile" className="w-20 h-20 rounded-full border-4 border-indigo-400 mb-2" />
-            )}
-            <div className="text-xl font-bold text-zinc-800 dark:text-zinc-100">Welcome, {user.name}!</div>
-            <div className="text-zinc-600 dark:text-zinc-300 text-sm">{user.email}</div>
-            <div className="text-zinc-400 dark:text-zinc-500 text-xs">Session ID: {user.sessionId}</div>
-            <button
-              className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
+    <div className="flex h-screen overflow-x-hidden w-full">
+      <AppSidebar />
+      <div className="flex-1 flex flex-col min-h-0 w-full min-w-0">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-zinc-100 shadow-sm sticky top-0 z-10">
+          <div className="flex items-center gap-4 flex-1">
+            <Search className="w-5 h-5 text-zinc-400" />
+            <Input
+              type="text"
+              placeholder="Search mail"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full max-w-lg px-4 py-2 rounded-full border border-zinc-200 bg-zinc-100 text-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-400 text-base"
+            />
           </div>
-        ) : (
-          <div className="text-lg text-zinc-700 dark:text-zinc-200 font-semibold">You are not logged in. <a href="/login" className="text-indigo-600 dark:text-sky-400 underline">Login with Google</a></div>
-        )}
-      </main>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Bell className="w-5 h-5 text-zinc-500" />
+              <span className="sr-only">Notifications</span>
+            </Button>
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <MoreHorizontal className="w-5 h-5 text-zinc-500" />
+              <span className="sr-only">More options</span>
+            </Button>
+            <Avatar className="h-8 w-8 ml-2">
+              <AvatarImage src={user?.profilePicture || "/placeholder.svg"} alt={user?.name || "User"} />
+              <AvatarFallback className="bg-blue-500 text-white text-sm font-medium">
+                {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
+              </AvatarFallback>
+            </Avatar>
+          </div>
+        </header>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-4 px-6 pt-4 pb-2 bg-white border-b border-zinc-100">
+          {TABS.map(({ label, icon: Icon }) => (
+            <button
+              key={label}
+              className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors relative
+            ${activeTab === label ? "text-blue-700" : "text-zinc-500 hover:text-zinc-700"}`}
+              onClick={() => setActiveTab(label)}
+            >
+              <Icon className="w-4 h-4" /> {label}
+              {activeTab === label && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-500 rounded-t-sm" />}
+            </button>
+          ))}
+          <Button variant="ghost" size="icon" className="ml-auto rounded-full text-zinc-500 hover:text-zinc-700">
+            <Plus className="w-4 h-4" />
+            <span className="sr-only">Add tab</span>
+          </Button>
+        </div>
+
+        {/* Email table header */}
+        <div className="flex items-center px-6 py-2 bg-white border-b border-zinc-100 text-xs text-zinc-500 font-semibold uppercase tracking-wide">
+          <input type="checkbox" className="accent-blue-500 w-4 h-4 mr-4" />
+          <span className="w-6 mr-2 flex items-center justify-center">
+            <StarOff className="w-4 h-4 text-zinc-400" />
+          </span>
+          <span className="flex-1">From</span>
+          <span className="w-32">Label</span>
+          <span className="flex-[2]">Subject</span>
+          <span className="w-20 text-right">Date</span>
+        </div>
+
+        {/* Email list */}
+        <main className="flex-1 overflow-y-auto bg-white">
+          {loading && <div className="text-zinc-500 p-8">Loading emails...</div>}
+          {error && <div className="text-red-600 p-8">{error}</div>}
+          {!loading && !error && filteredEmails.length === 0 && <div className="text-zinc-500 p-8">No emails found.</div>}
+          <ul className="divide-y divide-zinc-100">
+            {filteredEmails.map((email) => (
+              <li
+                key={email.id}
+                className={`flex items-center px-6 py-3 hover:bg-zinc-50 transition-colors cursor-pointer text-sm
+              ${email.read ? "bg-white" : "bg-blue-50 font-bold"}`}
+              >
+                <input type="checkbox" className="accent-blue-500 w-4 h-4 mr-4" />
+                <button onClick={() => toggleStar(email.id)} className="w-6 mr-2 flex items-center justify-center">
+                  {starred[email.id] ? (
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                  ) : (
+                    <StarOff className="w-4 h-4 text-zinc-400" />
+                  )}
+                </button>
+                <span className="flex-1 truncate text-zinc-800">{email.sender}</span>
+                <span className="w-32 truncate text-zinc-500">{email.label || "Client work"}</span>
+                <span className="flex-[2] truncate text-zinc-700">
+                  {email.subject} <span className="text-zinc-400 font-normal">- {email.snippet}</span>
+                </span>
+                <span className="w-20 text-right text-zinc-400 flex items-center justify-end gap-1">
+                  {new Date(email.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  {!email.read && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </main>
+      </div>
     </div>
-  );
+  )
 }
