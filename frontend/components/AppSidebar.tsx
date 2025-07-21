@@ -15,6 +15,7 @@ import {
   Send,
   FileText,
   ChevronUp,
+  Mail,
 } from "lucide-react"
 
 import {
@@ -83,15 +84,15 @@ export function AppSidebar() {
     <Sidebar className="bg-sidebar text-sidebar-foreground border-r border-zinc-200 w-60 min-w-0 max-w-full overflow-x-hidden" collapsible="none">
       <SidebarHeader className="p-4 flex flex-col gap-4 w-full min-w-0 max-w-full overflow-x-hidden">
         <div className="flex items-center gap-2">
-          {/* Placeholder for Google G icon */}
-          <img src="/placeholder.svg?height=24&width=24" alt="Google G logo" className="w-6 h-6" />
-          <span className="text-xl font-semibold text-zinc-800">Gmail</span>
+          {/* Email Agent logo */}
+          <Mail className="w-6 h-6 text-indigo-600" />
+          <span className="text-xl font-semibold text-zinc-800">Email Agent</span>
         </div>
         <Button className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full px-6 py-3 shadow transition text-base">
           <Plus className="w-5 h-5 mr-2" /> COMPOSE
         </Button>
       </SidebarHeader>
-      <SidebarContent className="flex-1 overflow-y-auto p-2 w-full min-w-0 max-w-full overflow-x-hidden">
+      <SidebarContent className="flex-1 overflow-y-auto p-2 w-full min-w-0 max-w-full overflow-x-hidden scrollbar-none hide-scrollbar">
         <SidebarGroup>
           <SidebarMenu>
             {SIDEBAR_ITEMS.map(({ label, icon: Icon, count, active, href }) => (
