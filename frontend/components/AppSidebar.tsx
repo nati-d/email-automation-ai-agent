@@ -81,23 +81,39 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar className="bg-sidebar text-sidebar-foreground border-r border-zinc-200 w-60 min-w-0 max-w-full overflow-x-hidden" collapsible="none">
+    <Sidebar
+      className="border-r w-60 min-w-0 max-w-full overflow-x-hidden "
+      style={{
+        background: 'var(--sidebar)',
+        color: 'var(--sidebar-foreground)',
+        borderColor: 'var(--sidebar-border)',
+      }}
+      collapsible="none"
+    >
       <SidebarHeader className="p-4 flex flex-col gap-4 w-full min-w-0 max-w-full overflow-x-hidden">
         <div className="flex items-center gap-2">
           {/* Email Agent logo */}
-          <Mail className="w-6 h-6 text-indigo-600" />
-          <span className="text-xl font-semibold text-zinc-800">Email Agent</span>
+          <Mail className="w-6 h-6" style={{ color: 'var(--primary)' }} />
+          <span className="text-xl font-semibold" style={{ color: 'var(--sidebar-foreground)' }}>Email Agent</span>
         </div>
-        <Button className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full px-6 py-3 shadow transition text-base">
+        <Button
+          className="w-full font-semibold rounded-full px-6 py-3 shadow transition text-base"
+          style={{ background: 'var(--)', color: 'var(--primary-foreground)' }}
+        >
           <Plus className="w-5 h-5 mr-2" /> COMPOSE
         </Button>
       </SidebarHeader>
-      <SidebarContent className="flex-1 overflow-y-auto p-2 w-full min-w-0 max-w-full overflow-x-hidden scrollbar-none hide-scrollbar">
+      <SidebarContent className="flex-1 overflow-y-auto px-4 w-full min-w-0 max-w-full overflow-x-hidden hide-scrollbar">
         <SidebarGroup>
           <SidebarMenu>
             {SIDEBAR_ITEMS.map(({ label, icon: Icon, count, active, href }) => (
               <SidebarMenuItem key={label}>
-                <SidebarMenuButton asChild isActive={active}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={active}
+                  className={active ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
+                  style={active ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
+                >
                   <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate">
                     <span className="flex items-center gap-2 truncate">
                       <Icon className="w-5 h-5 shrink-0" />
@@ -149,7 +165,7 @@ export function AppSidebar() {
           </SidebarGroup>
         </Collapsible>
       </SidebarContent>
-      <SidebarFooter className="p-2 border-t border-zinc-200 w-full min-w-0 max-w-full overflow-x-hidden">
+      <SidebarFooter className="p-2 border-t w-full min-w-0 max-w-full overflow-x-hidden" style={{ borderColor: 'var(--sidebar-border)' }}>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
