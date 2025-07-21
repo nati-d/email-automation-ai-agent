@@ -1,5 +1,9 @@
-import { LoginPage } from "@/components/auth/login-page";
+import Login from "../../components/login";
 
-export default function Login() {
-  return <LoginPage />;
-}
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <Login />
+    </div>
+  );
+} 
