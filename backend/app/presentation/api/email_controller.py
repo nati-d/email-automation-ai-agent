@@ -144,6 +144,46 @@ async def get_emails_by_account(
     )
 
 
+@router.post("/fetch-starred", response_model=SendEmailResponse)
+async def fetch_starred_emails(
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=100, description="Number of starred emails to fetch")
+) -> SendEmailResponse:
+    """
+    Fetch starred emails from Gmail and store them in the database.
+    
+    This endpoint will:
+    1. Connect to Gmail using the user's OAuth token
+    2. Fetch starred emails using the 'is:starred' query
+    3. Store them in the database with is_starred flag
+    4. Optionally summarize them using AI
+    """
+    try:
+        container = get_container()
+        use_case = container.fetch_starred_emails_use_case()
+        
+        # Get OAuth token for the current user
+        # This would need to be implemented based on your OAuth session management
+        # For now, we'll need to get the OAuth token from the user's session
+        
+        # TODO: Get OAuth token from user session
+        # oauth_token = get_user_oauth_token(current_user.id)
+        
+        # For now, return a placeholder response
+        return SendEmailResponse(
+            success=True,
+            message="Starred emails fetch endpoint created. OAuth token integration needed.",
+            email_id=None,
+            sent_at=None
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch starred emails: {str(e)}"
+        )
+
+
 @router.get("/tasks", response_model=EmailListResponse)
 async def get_task_emails(
     current_user: UserDTO = Depends(get_current_user),
@@ -199,6 +239,39 @@ async def get_inbox_emails(
         total_count=len(inbox_emails),
         page=1,
         page_size=len(inbox_emails),
+        has_next=False,
+        has_prev=False
+    )
+
+
+@router.get("/starred", response_model=EmailListResponse)
+async def get_starred_emails(
+    current_user: UserDTO = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=100, description="Number of emails to return"),
+    offset: int = Query(0, ge=0, description="Number of emails to skip")
+) -> EmailListResponse:
+    """Get starred emails for the current user"""
+    container = get_container()
+    use_case = container.list_emails_use_case()
+    
+    result = await use_case.execute(
+        account_owner=current_user.email,
+        limit=limit
+    )
+    
+    # Filter for starred emails (check metadata for is_starred flag)
+    starred_emails = []
+    for email in result.emails:
+        if hasattr(email, 'metadata') and email.metadata and email.metadata.get('is_starred'):
+            starred_emails.append(email)
+    
+    emails = [EmailResponse(**{**email.__dict__}) for email in starred_emails]
+    
+    return EmailListResponse(
+        emails=emails,
+        total_count=len(starred_emails),
+        page=1,
+        page_size=len(starred_emails),
         has_next=False,
         has_prev=False
     )

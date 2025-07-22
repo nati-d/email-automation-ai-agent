@@ -286,14 +286,6 @@ export function AppSidebar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
                   <DropdownMenuItem>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
                     <HelpCircle className="mr-2 h-4 w-4" />
                     <span>Help</span>
                   </DropdownMenuItem>

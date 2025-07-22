@@ -57,6 +57,7 @@ from ...application.use_cases.user_account_use_cases import (
     UpdateUserAccountUseCase, DeleteUserAccountUseCase, CheckAccountExistsUseCase,
     AddAccountIfNotExistsUseCase
 )
+from ...application.use_cases.email_use_cases import FetchStarredEmailsUseCase
 
 
 class Container:
@@ -87,6 +88,7 @@ class Container:
         self._fetch_initial_emails_use_case: Optional[FetchInitialEmailsUseCase] = None
         self._summarize_email_use_case: Optional[SummarizeEmailUseCase] = None
         self._summarize_multiple_emails_use_case: Optional[SummarizeMultipleEmailsUseCase] = None
+        self._fetch_starred_emails_use_case: Optional[FetchStarredEmailsUseCase] = None
         
         # User use cases
         self._create_user_use_case: Optional[CreateUserUseCase] = None
@@ -313,6 +315,29 @@ class Container:
         else:
             print(f"🔧 DEBUG: [Container] Returning existing FetchInitialEmailsUseCase")
         return self._fetch_initial_emails_use_case
+
+    def fetch_starred_emails_use_case(self) -> FetchStarredEmailsUseCase:
+        """Get fetch starred emails use case"""
+        if self._fetch_starred_emails_use_case is None:
+            print(f"🔧 DEBUG: [Container] Creating FetchStarredEmailsUseCase")
+            email_repo = self.email_repository()
+            gmail_svc = self.gmail_service()
+            llm_svc = self.llm_service()
+            
+            print(f"🔧 DEBUG: [Container] Creating FetchStarredEmailsUseCase with:")
+            print(f"   - email_repository: {type(email_repo).__name__}")
+            print(f"   - gmail_service: {type(gmail_svc).__name__}")
+            print(f"   - llm_service: {type(llm_svc).__name__}")
+            
+            self._fetch_starred_emails_use_case = FetchStarredEmailsUseCase(
+                email_repo,
+                gmail_svc,
+                llm_svc
+            )
+            print(f"🔧 DEBUG: [Container] FetchStarredEmailsUseCase created successfully")
+        else:
+            print(f"🔧 DEBUG: [Container] Returning existing FetchStarredEmailsUseCase")
+        return self._fetch_starred_emails_use_case
     
     def summarize_email_use_case(self) -> SummarizeEmailUseCase:
         """Get summarize email use case"""

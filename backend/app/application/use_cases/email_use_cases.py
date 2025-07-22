@@ -364,212 +364,201 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                     "message": "No emails found to import"
                 }
             
-            # Store emails in repository and summarize them
-            stored_count = 0
-            failed_count = 0
-            summarized_count = 0
-            
-            for i, email in enumerate(emails):
+            # Store emails in database
+            print("🔄 Storing emails in database...")
+            stored_emails = []
+            for email in emails:
                 try:
-                    print(f"🔄 Storing email {i+1}/{len(emails)}: {email.subject[:50]}...")
-                    
-                    # Update account ownership if different from default
-                    if actual_account_owner != user_email:
+                    # Set account ownership
                         email.account_owner = actual_account_owner
                         email.email_holder = user_email
-                        print(f"   - Set account_owner: {email.account_owner}")
-                        print(f"   - Set email_holder: {email.email_holder}")
                     
-                    saved_email = await self.email_repository.save(email)
-                    print(f"✅ Stored email with ID: {saved_email.id}")
-                    stored_count += 1
-                    
-                    # Process email with AI (summarization and categorization) if LLM service is available
-                    if self.llm_service:
-                        try:
-                            print(f"🔄 Processing email {saved_email.id} with AI...")
-                            print(f"🔧 DEBUG: LLM service type: {type(self.llm_service).__name__}")
-                            print(f"🔧 DEBUG: Email subject: {saved_email.subject}")
-                            print(f"🔧 DEBUG: Email body length: {len(saved_email.body)} chars")
-                            print(f"🔧 DEBUG: Has HTML body: {saved_email.html_body is not None}")
-                            
-                            # Prepare content for AI processing
-                            email_content = saved_email.body
-                            if saved_email.html_body:
-                                import re
-                                print(f"🔧 DEBUG: HTML body length: {len(saved_email.html_body)} chars")
-                                email_content = re.sub(r'<[^>]+>', '', saved_email.html_body)
-                                print(f"🔧 DEBUG: Cleaned HTML content length: {len(email_content)} chars")
-                            
-                            # Get context information
-                            sender = str(saved_email.sender)
-                            recipient = str(saved_email.recipients[0]) if saved_email.recipients else ""
-                            print(f"🔧 DEBUG: Sender: {sender}")
-                            print(f"🔧 DEBUG: Recipient: {recipient}")
-                            print(f"🔧 DEBUG: Content to process: {email_content[:200]}...")
-                            
-                            # Step 1: Categorize email
-                            print(f"🔧 DEBUG: Calling LLM service.categorize_email...")
-                            category = self.llm_service.categorize_email(
-                                email_content=email_content,
-                                email_subject=saved_email.subject,
-                                sender=sender,
-                                recipient=recipient
-                            )
-                            print(f"🔧 DEBUG: Email categorized as: {category}")
-                            
-                            # Set email type based on categorization
-                            from ...domain.entities.email import EmailType
-                            email_type = EmailType.TASKS if category == 'tasks' else EmailType.INBOX
-                            saved_email.set_email_type(email_type)
-                            print(f"🔧 DEBUG: Email type set to: {email_type.value}")
-                            
-                            # Step 1.5: Assign user-defined category for inbox emails
-                            if email_type == EmailType.INBOX and self.category_repository:
-                                try:
-                                    print(f"🔧 DEBUG: Assigning user-defined category for inbox email...")
-                                    user_categories = await self.category_repository.find_active_by_user_id(user_email)
-                                    if user_categories:
-                                        # Use simple keyword matching to assign category
-                                        assigned_category = self._assign_user_category(
-                                            email_content, saved_email.subject, user_categories
-                                        )
-                                        if assigned_category:
-                                            saved_email.update_category(assigned_category)
-                                            print(f"🔧 DEBUG: Assigned user category: {assigned_category}")
-                                        else:
-                                            print(f"🔧 DEBUG: No matching user category found, using 'uncategorized'")
-                                            saved_email.update_category("uncategorized")
-                                    else:
-                                        print(f"🔧 DEBUG: No user categories found, using 'uncategorized'")
-                                        saved_email.update_category("uncategorized")
-                                except Exception as cat_error:
-                                    print(f"⚠️ Failed to assign user category: {str(cat_error)}")
-                                    # Continue without user category assignment
-                                    pass
-                            
-                            # Step 2: Summarize email
-                            print(f"🔧 DEBUG: Calling LLM service.summarize_email...")
-                            summarization_result = self.llm_service.summarize_email(
-                                email_content=email_content,
-                                email_subject=saved_email.subject,
-                                sender=sender,
-                                recipient=recipient
-                            )
-                            print(f"🔧 DEBUG: LLM service returned: {summarization_result}")
-                            
-                            # Validate summarization result
-                            if not summarization_result:
-                                print(f"⚠️ LLM service returned None or empty result")
-                                continue
-                            
-                            summary = summarization_result.get('summary', '')
-                            main_concept = summarization_result.get('main_concept', '')
-                            sentiment = summarization_result.get('sentiment', '')
-                            key_topics = summarization_result.get('key_topics', [])
-                            
-                            print(f"🔧 DEBUG: Extracted summary: {summary[:100]}...")
-                            print(f"🔧 DEBUG: Extracted main_concept: {main_concept}")
-                            print(f"🔧 DEBUG: Extracted sentiment: {sentiment}")
-                            print(f"🔧 DEBUG: Extracted key_topics: {key_topics}")
-                            
-                            # Set summarization data on email
-                            print(f"🔧 DEBUG: Setting summarization on email...")
-                            saved_email.set_summarization(
-                                summary=summary,
-                                main_concept=main_concept,
-                                sentiment=sentiment,
-                                key_topics=key_topics
-                            )
-                            print(f"🔧 DEBUG: Summarization set successfully")
-                            
-                            # Save updated email with both categorization and summarization
-                            print(f"🔧 DEBUG: Saving email with AI processing...")
-                            await self.email_repository.update(saved_email)
-                            print(f"✅ Email processed successfully (Type: {category}, Summarized: Yes)")
-                            summarized_count += 1
-                            
-                        except Exception as ai_error:
-                            print(f"⚠️ Failed to process email {saved_email.id} with AI: {str(ai_error)}")
-                            print(f"🔧 DEBUG: AI processing error type: {type(ai_error).__name__}")
-                            import traceback
-                            print(f"🔧 DEBUG: AI processing error traceback: {traceback.format_exc()}")
-                            # Continue with next email even if AI processing fails
-                            continue
-                    else:
-                        print(f"⚠️ LLM service is None - skipping AI processing for email {saved_email.id}")
+                    # Store email
+                    stored_email = await self.email_repository.save(email)
+                    stored_emails.append(stored_email)
+                    print(f"✅ Stored email: {stored_email.subject[:50]}...")
                     
                 except Exception as e:
-                    print(f"⚠️ Failed to store email {email.subject}: {str(e)}")
-                    print(f"⚠️ Storage error type: {type(e).__name__}")
-                    failed_count += 1
+                    print(f"⚠️ Failed to store email {email.subject[:50]}: {str(e)}")
                     continue
             
-            print(f"✅ Email import complete:")
-            print(f"   - Successfully imported: {stored_count}")
-            print(f"   - Failed to import: {failed_count}")
-            print(f"   - Summarized: {summarized_count}")
-            print(f"   - Total processed: {len(emails)}")
+            print(f"✅ Successfully stored {len(stored_emails)} emails")
+            
+            # Summarize emails if LLM service is available
+            summarized_count = 0
+            if self.llm_service and stored_emails:
+                print("🔄 Summarizing emails with LLM...")
+                summarized_count = await self._summarize_emails(stored_emails)
+                print(f"✅ Summarized {summarized_count} emails")
             
             return {
                 "success": True,
-                "emails_imported": stored_count,
-                "emails_failed": failed_count,
+                "emails_imported": len(stored_emails),
                 "emails_summarized": summarized_count,
-                "total_found": len(emails),
-                "message": f"Successfully imported {stored_count} emails (summarized: {summarized_count})"
+                "message": f"Successfully imported {len(stored_emails)} emails"
             }
             
         except Exception as e:
-            print(f"❌ Failed to fetch initial emails: {str(e)}")
-            print(f"❌ Error type: {type(e).__name__}")
+            print(f"❌ FetchInitialEmailsUseCase failed: {str(e)}")
             import traceback
             print(f"❌ Full traceback: {traceback.format_exc()}")
             return {
                 "success": False,
-                "emails_imported": 0,
                 "error": str(e),
-                "message": "Failed to import emails"
+                "message": f"Failed to import emails: {str(e)}"
             }
     
-    def _assign_user_category(self, email_content: str, subject: str, user_categories) -> Optional[str]:
-        """Assign a user-defined category to an email based on content and subject"""
-        # Combine content and subject for analysis
-        text_to_analyze = f"{subject} {email_content}".lower()
+    async def _summarize_emails(self, emails: List[Email]) -> int:
+        """Summarize a list of emails using LLM service"""
+        summarized_count = 0
         
-        # Define keywords for common category types
-        category_keywords = {
-            "work": ["work", "office", "meeting", "project", "deadline", "report", "presentation", "business", "client", "team"],
-            "amazon": ["amazon", "order", "shipping", "delivery", "tracking", "package", "purchase", "product"],
-            "mastercard": ["mastercard", "credit card", "payment", "transaction", "charge", "statement", "bank", "account"],
-            "personal": ["personal", "family", "friend", "birthday", "anniversary", "home", "love", "party"],
-            "finance": ["bank", "account", "balance", "transfer", "investment", "loan", "money", "financial", "budget"],
-            "shopping": ["purchase", "buy", "sale", "discount", "coupon", "deal", "store", "shop", "retail"],
-            "uncategorized": ["uncategorized", "unknown", "misc", "other"]
-        }
-        
-        # Find the best matching category
-        best_match = None
-        best_score = 0
-        
-        for category in user_categories:
-            category_name = category.name.lower()
+        for email in emails:
+            try:
+                # Skip if already summarized
+                if email.summary:
+                    continue
+                
+                # Summarize email
+                summary_data = self.llm_service.summarize_email(
+                    email_content=email.body,
+                    email_subject=email.subject,
+                    sender=str(email.sender),
+                    recipient=str(email.recipients[0]) if email.recipients else ""
+                )
+                
+                # Update email with summary data
+                email.summary = summary_data.get('summary')
+                email.main_concept = summary_data.get('main_concept')
+                email.sentiment = summary_data.get('sentiment')
+                email.key_topics = summary_data.get('key_topics', [])
+                email.summarized_at = datetime.utcnow()
+                
+                # Save updated email
+                await self.email_repository.save(email)
+                summarized_count += 1
+                
+            except Exception as e:
+                print(f"⚠️ Failed to summarize email {email.subject[:50]}: {str(e)}")
+                                continue
+                            
+        return summarized_count
+
+
+class FetchStarredEmailsUseCase(EmailUseCaseBase):
+    """Use case for fetching starred emails from Gmail"""
+    
+    def __init__(
+        self, 
+        email_repository: EmailRepository,
+        gmail_service,
+        llm_service: Optional[LLMService] = None
+    ):
+        super().__init__(email_repository)
+        self.gmail_service = gmail_service
+        self.llm_service = llm_service
+    
+    async def execute(self, oauth_token, user_email: str, limit: int = 50, account_owner: Optional[str] = None) -> Dict[str, Any]:
+        """Fetch starred emails from Gmail and store them"""
+        try:
+            print(f"🔄 FetchStarredEmailsUseCase.execute called:")
+            print(f"   - user_email: {user_email}")
+            print(f"   - limit: {limit}")
+            print(f"   - account_owner: {account_owner}")
             
-            # Check if category name matches any predefined keywords
-            if category_name in category_keywords:
-                keywords = category_keywords[category_name]
-                score = sum(1 for keyword in keywords if keyword in text_to_analyze)
-                if score > best_score:
-                    best_score = score
-                    best_match = category.name
+            # Use account_owner if provided, otherwise use user_email
+            actual_account_owner = account_owner or user_email
             
-            # Also check if category name appears directly in the text
-            elif category_name in text_to_analyze:
-                if best_score == 0:  # Only use direct match if no keyword match found
-                    best_match = category.name
-                    best_score = 1
+            # Fetch starred emails from Gmail
+            print("🔄 Calling gmail_service.fetch_starred_emails...")
+            emails = await self.gmail_service.fetch_starred_emails(oauth_token, user_email, limit)
+            print(f"⭐ Gmail service returned {len(emails) if emails else 0} starred emails")
+            
+            if not emails:
+                print("⚠️ No starred emails found to import")
+                return {
+                    "success": True,
+                    "emails_imported": 0,
+                    "message": "No starred emails found to import"
+                }
+            
+            # Store emails in database
+            print("🔄 Storing starred emails in database...")
+            stored_emails = []
+            for email in emails:
+                try:
+                    # Set account ownership
+                    email.account_owner = actual_account_owner
+                    email.email_holder = user_email
+                    
+                    # Store email
+                    stored_email = await self.email_repository.save(email)
+                    stored_emails.append(stored_email)
+                    print(f"✅ Stored starred email: {stored_email.subject[:50]}...")
+                    
+                except Exception as e:
+                    print(f"⚠️ Failed to store starred email {email.subject[:50]}: {str(e)}")
+                    continue
+            
+            print(f"✅ Successfully stored {len(stored_emails)} starred emails")
+            
+            # Summarize emails if LLM service is available
+            summarized_count = 0
+            if self.llm_service and stored_emails:
+                print("🔄 Summarizing starred emails with LLM...")
+                summarized_count = await self._summarize_emails(stored_emails)
+                print(f"✅ Summarized {summarized_count} starred emails")
+            
+            return {
+                "success": True,
+                "emails_imported": len(stored_emails),
+                "emails_summarized": summarized_count,
+                "message": f"Successfully imported {len(stored_emails)} starred emails"
+            }
+            
+        except Exception as e:
+            print(f"❌ FetchStarredEmailsUseCase failed: {str(e)}")
+            import traceback
+            print(f"❌ Full traceback: {traceback.format_exc()}")
+            return {
+                "success": False,
+                "error": str(e),
+                "message": f"Failed to import starred emails: {str(e)}"
+            }
+    
+    async def _summarize_emails(self, emails: List[Email]) -> int:
+        """Summarize a list of emails using LLM service"""
+        summarized_count = 0
         
-        return best_match
+        for email in emails:
+            try:
+                # Skip if already summarized
+                if email.summary:
+                    continue
+                
+                # Summarize email
+                summary_data = self.llm_service.summarize_email(
+                    email_content=email.body,
+                    email_subject=email.subject,
+                    sender=str(email.sender),
+                    recipient=str(email.recipients[0]) if email.recipients else ""
+                )
+                
+                # Update email with summary data
+                email.summary = summary_data.get('summary')
+                email.main_concept = summary_data.get('main_concept')
+                email.sentiment = summary_data.get('sentiment')
+                email.key_topics = summary_data.get('key_topics', [])
+                email.summarized_at = datetime.utcnow()
+                
+                # Save updated email
+                await self.email_repository.save(email)
+                summarized_count += 1
+                
+            except Exception as e:
+                print(f"⚠️ Failed to summarize starred email {email.subject[:50]}: {str(e)}")
+                continue
+        
+        return summarized_count
 
 
 class SummarizeEmailUseCase(EmailUseCaseBase):
