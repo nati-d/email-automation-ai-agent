@@ -433,7 +433,8 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                             except Exception:
                                 summary_data = {}
                         else:
-                            summary_data = {}
+                            # Not a coroutine and not a dict, skip summarization for this email
+                            continue
                     elif isinstance(maybe_coro, dict):
                         summary_data = maybe_coro
                 if not isinstance(summary_data, dict):
@@ -564,7 +565,8 @@ class FetchStarredEmailsUseCase(EmailUseCaseBase):
                             except Exception:
                                 summary_data = {}
                         else:
-                            summary_data = {}
+                            # Not a coroutine and not a dict, skip summarization for this email
+                            continue
                     elif isinstance(maybe_coro, dict):
                         summary_data = maybe_coro
                 if not isinstance(summary_data, dict):
