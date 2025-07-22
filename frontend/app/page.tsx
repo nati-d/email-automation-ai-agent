@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchEmails, fetchEmailsByCategory, type Email as BaseEmail } from "../lib/api/email";
+import { fetchEmails, fetchEmailsByCategory, fetchInboxEmails, fetchTaskEmails, type Email as BaseEmail } from "../lib/api/email";
 import { Star, StarOff, Mail, UserIcon, Tag, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../lib/utils";
@@ -32,9 +32,8 @@ interface Email extends BaseEmail {
 }
 
 const TABS = [
-  { label: "Primary", icon: Mail },
-  { label: "Social", icon: UserIcon },
-  { label: "Updates", icon: Tag },
+  { label: "Inbox", icon: Mail },
+  { label: "Tasks", icon: Tag },
 ]
 
 export default function Home() {
@@ -52,10 +51,14 @@ export default function Home() {
       const fetchData = async () => {
         try {
           let data: Email[]
-          if (currentCategory) {
-            data = await fetchEmailsByCategory(currentCategory)
+          if (activeTab === "Inbox") {
+            data = await fetchInboxEmails();
+          } else if (activeTab === "Tasks") {
+            data = await fetchTaskEmails();
+          } else if (currentCategory) {
+            data = await fetchEmailsByCategory(currentCategory);
           } else {
-            data = await fetchEmails()
+            data = await fetchEmails();
           }
           setEmails(data)
         } catch (err: any) {
@@ -66,7 +69,7 @@ export default function Home() {
       }
       fetchData()
     }
-  }, [user, currentCategory])
+  }, [user, currentCategory, activeTab])
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
