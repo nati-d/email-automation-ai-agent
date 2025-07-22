@@ -645,7 +645,7 @@ class AddAnotherAccountUseCase(OAuthUseCaseBase):
                     email_result = await self.fetch_emails_use_case.execute(
                         oauth_token=token_data,
                         user_email=new_account_email,  # Use the new account's email as string
-                        limit=50,
+                        limit=10,
                         account_owner=current_user_email  # Set the logged-in user as account owner
                     )
                     print(f"✅ Email fetch result: {email_result}")
@@ -662,12 +662,12 @@ class AddAnotherAccountUseCase(OAuthUseCaseBase):
                         "message": "Failed to fetch emails but account was added successfully"
                     }
             elif account_exists:
-                print(f"ℹ️ Skipping email fetch - account {new_account_email} already exists")
+                print(f"ℹ️ Skipping email fetch - account {new_account_email} already exists for user {existing_user.email.value}")
                 email_result = {
                     "success": True,
                     "emails_imported": 0,
                     "emails_summarized": 0,
-                    "message": f"Account {new_account_email} already exists, no emails fetched"
+                    "message": f"Account {new_account_email} already exists for user {existing_user.email.value}, no emails fetched"
                 }
             else:
                 print(f"⚠️ No fetch_emails_use_case available, skipping email import")

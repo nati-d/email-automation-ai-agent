@@ -32,6 +32,7 @@ interface Email extends BaseEmail {
 }
 
 const TABS = [
+  { label: "All", icon: Mail },
   { label: "Inbox", icon: Mail },
   { label: "Tasks", icon: Tag },
 ]
@@ -51,7 +52,9 @@ export default function Home() {
       const fetchData = async () => {
         try {
           let data: Email[]
-          if (activeTab === "Inbox") {
+          if (activeTab === "All") {
+            data = await fetchEmails();
+          } else if (activeTab === "Inbox") {
             data = await fetchInboxEmails();
           } else if (activeTab === "Tasks") {
             data = await fetchTaskEmails();

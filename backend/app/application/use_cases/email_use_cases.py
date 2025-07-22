@@ -383,11 +383,8 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                                 sender=str(email.sender),
                                 recipient=str(email.recipients[0]) if email.recipients else ""
                             )
-                            import inspect
-                            if category_result is not None and inspect.iscoroutine(category_result):
-                                category = await category_result
-                            else:
-                                category = category_result
+                            # categorize_email is synchronous, do not await
+                            category = category_result
                             if isinstance(category, str) and category.strip().lower() == 'tasks':
                                 email.set_email_type(EmailType.TASKS)
                             else:
@@ -450,15 +447,9 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                         sender=str(email.sender),
                         recipient=str(email.recipients[0]) if email.recipients else ""
                     )
+                    # summarize_email is synchronous, do not await
                     if maybe_coro is not None and not isinstance(maybe_coro, dict):
-                        if inspect.iscoroutine(maybe_coro):
-                            try:
-                                summary_data = await maybe_coro
-                            except Exception:
-                                summary_data = {}
-                        else:
-                            # Not a coroutine and not a dict, skip summarization for this email
-                            continue
+                        summary_data = maybe_coro
                     elif isinstance(maybe_coro, dict):
                         summary_data = maybe_coro
                 if not isinstance(summary_data, dict):
@@ -582,15 +573,9 @@ class FetchStarredEmailsUseCase(EmailUseCaseBase):
                         sender=str(email.sender),
                         recipient=str(email.recipients[0]) if email.recipients else ""
                     )
+                    # summarize_email is synchronous, do not await
                     if maybe_coro is not None and not isinstance(maybe_coro, dict):
-                        if inspect.iscoroutine(maybe_coro):
-                            try:
-                                summary_data = await maybe_coro
-                            except Exception:
-                                summary_data = {}
-                        else:
-                            # Not a coroutine and not a dict, skip summarization for this email
-                            continue
+                        summary_data = maybe_coro
                     elif isinstance(maybe_coro, dict):
                         summary_data = maybe_coro
                 if not isinstance(summary_data, dict):
