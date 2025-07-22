@@ -106,13 +106,15 @@ class OAuthTokenRefreshResponse(BaseModel):
     access_token: str = Field(..., description="New access token")
     expires_in: int = Field(..., description="Token expiration time in seconds")
     message: str = Field(default="Token refreshed successfully", description="Success message")
+    session_id: Optional[str] = Field(None, description="Session ID associated with the token")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "access_token": "ya29.new-access-token",
                 "expires_in": 3600,
-                "message": "Token refreshed successfully"
+                "message": "Token refreshed successfully",
+                "session_id": "session-1234567890abcdef"
             }
         }
 

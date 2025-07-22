@@ -307,7 +307,8 @@ async def refresh_oauth_token(
         return OAuthTokenRefreshResponse(
             access_token=result["access_token"],
             expires_in=result["expires_in"],
-            message="Token refreshed successfully"
+            message="Token refreshed successfully",
+            session_id=session_id
         )
         
     except DomainException as e:
