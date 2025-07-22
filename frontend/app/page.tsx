@@ -124,6 +124,7 @@ export default function Home() {
           </span>
           <span className="flex-1">From</span>
           <span className="flex-[2]">Subject</span>
+          <span className="flex-1">Email Holder</span>
           <span className="w-20 text-right">Date</span>
         </div>
 
@@ -158,6 +159,7 @@ export default function Home() {
                     <span className="flex-[2] truncate">
                       {email.subject} <span className="text-[var(--muted-foreground)] font-normal">- {email.snippet}</span>
                     </span>
+                    <span className="flex-1 truncate text-muted-foreground">{email.email_holder || '-'}</span>
                     <span className="w-20 text-right flex items-center justify-end gap-1" style={{ color: 'var(--muted-foreground)' }}>
                       {formatEmailDate(email.sent_at || email.created_at || email.updated_at)}
                       {!email.read && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}

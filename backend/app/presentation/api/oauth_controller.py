@@ -191,12 +191,12 @@ async def google_oauth_callback(
             return RedirectResponse(url=redirect_url)
         
         # Check if this is an add account flow
-        is_add_account_flow = state and "_add_account" in state
+        is_add_account_flow = state is not None and "_add_account" in state
         
         if is_add_account_flow:
             # Extract session ID from state parameter
             session_id = None
-            if "_add_account_" in state:
+            if state is not None and "_add_account_" in state:
                 # Format: {random_state}_add_account_{session_id}
                 parts = state.split("_add_account_")
                 if len(parts) == 2:
@@ -215,12 +215,17 @@ async def google_oauth_callback(
             if session_id:
                 redirect_params.append(f"session_id={session_id}")
             
-            redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
+            redirect_url = f"{settings.frontend_url}/?{'&'.join(redirect_params)}"
             print(f"✅ Add account OAuth successful! Redirecting to: {redirect_url}")
             return RedirectResponse(url=redirect_url)
         
         # Process OAuth callback for normal login flow
         print("🔄 Processing OAuth callback with use case...")
+        if code is None or state is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"error": "MISSING_CODE_OR_STATE", "message": "Missing code or state in OAuth callback."}
+            )
         try:
             result = await use_case.execute(code=code, state=state, error=error)
             print(f"✅ Use case executed successfully for user: {result['user'].email}")

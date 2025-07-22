@@ -66,6 +66,7 @@ export function AppSidebar() {
   const [loading, setLoading] = React.useState(true)
   const [modalOpen, setModalOpen] = React.useState(false)
   const [modalLoading, setModalLoading] = React.useState(false)
+  const [addAccountLoading, setAddAccountLoading] = React.useState(false)
 
   React.useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -117,6 +118,34 @@ export function AppSidebar() {
     localStorage.removeItem("user")
     window.location.reload()
   }
+
+  // Add Account integration
+  const handleAddAccount = async () => {
+    if (typeof window === 'undefined') return;
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+    const sessionId = user.sessionId || user.session_id;
+    if (!sessionId) return;
+    setAddAccountLoading(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/oauth/add-another-account/initiate', {
+        headers: {
+          'Authorization': `Bearer ${sessionId}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok && data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        alert(data.detail?.message || data.message || 'Failed to get OAuth URL for adding another account');
+      }
+    } catch (error: any) {
+      alert('Failed to initiate add account: ' + (error.message || error));
+    } finally {
+      setAddAccountLoading(false);
+    }
+  };
 
   return (
     <>
@@ -285,9 +314,9 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
-                  <DropdownMenuItem onClick={() => console.log('Add Account clicked')}>
+                  <DropdownMenuItem onClick={handleAddAccount} disabled={addAccountLoading}>
                     <Plus className="mr-2 h-4 w-4" />
-                    <span>Add Account</span>
+                    <span>{addAccountLoading ? 'Redirecting...' : 'Add Account'}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
                     <HelpCircle className="mr-2 h-4 w-4" />
