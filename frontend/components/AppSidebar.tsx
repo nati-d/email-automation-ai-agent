@@ -285,6 +285,10 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
+                  <DropdownMenuItem onClick={() => console.log('Add Account clicked')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    <span>Add Account</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem>
                     <HelpCircle className="mr-2 h-4 w-4" />
                     <span>Help</span>
