@@ -176,7 +176,7 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupLabel asChild>
                 <div className="flex items-center justify-between w-full">
-                  <CollapsibleTrigger className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 px-2 py-2 rounded-md">
+                  <CollapsibleTrigger className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 py-2 rounded-md">
                     Categories
                     <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                   </CollapsibleTrigger>

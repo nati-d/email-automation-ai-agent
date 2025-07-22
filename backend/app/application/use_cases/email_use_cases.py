@@ -17,6 +17,7 @@ from ...domain.exceptions.domain_exceptions import (
 )
 from ...application.dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO, EmailListDTO
 from ...infrastructure.external_services.llm_service import LLMService
+import inspect
 
 
 class EmailUseCaseBase:
@@ -370,14 +371,12 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
             for email in emails:
                 try:
                     # Set account ownership
-                        email.account_owner = actual_account_owner
-                        email.email_holder = user_email
-                    
+                    email.account_owner = actual_account_owner
+                    email.email_holder = user_email
                     # Store email
                     stored_email = await self.email_repository.save(email)
                     stored_emails.append(stored_email)
                     print(f"✅ Stored email: {stored_email.subject[:50]}...")
-                    
                 except Exception as e:
                     print(f"⚠️ Failed to store email {email.subject[:50]}: {str(e)}")
                     continue
@@ -419,12 +418,26 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                     continue
                 
                 # Summarize email
-                summary_data = self.llm_service.summarize_email(
-                    email_content=email.body,
-                    email_subject=email.subject,
-                    sender=str(email.sender),
-                    recipient=str(email.recipients[0]) if email.recipients else ""
-                )
+                summary_data = {}
+                if self.llm_service is not None and hasattr(self.llm_service, 'summarize_email') and callable(self.llm_service.summarize_email):
+                    maybe_coro = self.llm_service.summarize_email(
+                        email_content=email.body,
+                        email_subject=email.subject,
+                        sender=str(email.sender),
+                        recipient=str(email.recipients[0]) if email.recipients else ""
+                    )
+                    if maybe_coro is not None and not isinstance(maybe_coro, dict):
+                        if inspect.iscoroutine(maybe_coro):
+                            try:
+                                summary_data = await maybe_coro
+                            except Exception:
+                                summary_data = {}
+                        else:
+                            summary_data = {}
+                    elif isinstance(maybe_coro, dict):
+                        summary_data = maybe_coro
+                if not isinstance(summary_data, dict):
+                    summary_data = {}
                 
                 # Update email with summary data
                 email.summary = summary_data.get('summary')
@@ -439,8 +452,8 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                 
             except Exception as e:
                 print(f"⚠️ Failed to summarize email {email.subject[:50]}: {str(e)}")
-                                continue
-                            
+                continue
+        
         return summarized_count
 
 
@@ -536,12 +549,26 @@ class FetchStarredEmailsUseCase(EmailUseCaseBase):
                     continue
                 
                 # Summarize email
-                summary_data = self.llm_service.summarize_email(
-                    email_content=email.body,
-                    email_subject=email.subject,
-                    sender=str(email.sender),
-                    recipient=str(email.recipients[0]) if email.recipients else ""
-                )
+                summary_data = {}
+                if self.llm_service is not None and hasattr(self.llm_service, 'summarize_email') and callable(self.llm_service.summarize_email):
+                    maybe_coro = self.llm_service.summarize_email(
+                        email_content=email.body,
+                        email_subject=email.subject,
+                        sender=str(email.sender),
+                        recipient=str(email.recipients[0]) if email.recipients else ""
+                    )
+                    if maybe_coro is not None and not isinstance(maybe_coro, dict):
+                        if inspect.iscoroutine(maybe_coro):
+                            try:
+                                summary_data = await maybe_coro
+                            except Exception:
+                                summary_data = {}
+                        else:
+                            summary_data = {}
+                    elif isinstance(maybe_coro, dict):
+                        summary_data = maybe_coro
+                if not isinstance(summary_data, dict):
+                    summary_data = {}
                 
                 # Update email with summary data
                 email.summary = summary_data.get('summary')
