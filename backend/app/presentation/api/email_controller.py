@@ -199,8 +199,8 @@ async def get_task_emails(
         limit=limit
     )
     
-    # Filter for task emails
-    task_emails = [email for email in result.emails if email.category == "tasks"]
+    # Filter for task emails using email_type
+    task_emails = [email for email in result.emails if getattr(email, 'email_type', None) == 'tasks']
     
     emails = [EmailResponse(**{**email.__dict__}) for email in task_emails]
     
@@ -229,8 +229,8 @@ async def get_inbox_emails(
         limit=limit
     )
     
-    # Filter for received emails
-    inbox_emails = [email for email in result.emails if email.status == "received"]
+    # Filter for inbox emails using email_type
+    inbox_emails = [email for email in result.emails if getattr(email, 'email_type', None) == 'inbox']
     
     emails = [EmailResponse(**{**email.__dict__}) for email in inbox_emails]
     

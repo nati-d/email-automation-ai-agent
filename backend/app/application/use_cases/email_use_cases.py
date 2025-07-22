@@ -18,6 +18,7 @@ from ...domain.exceptions.domain_exceptions import (
 from ...application.dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO, EmailListDTO
 from ...infrastructure.external_services.llm_service import LLMService
 import inspect
+from ...domain.entities.email import EmailType
 
 
 class EmailUseCaseBase:
@@ -373,6 +374,29 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
                     # Set account ownership
                     email.account_owner = actual_account_owner
                     email.email_holder = user_email
+                    # Categorize email as 'inbox' or 'tasks' using LLM if available
+                    if self.llm_service is not None and hasattr(self.llm_service, 'categorize_email') and callable(self.llm_service.categorize_email):
+                        try:
+                            category_result = self.llm_service.categorize_email(
+                                email_content=email.body,
+                                email_subject=email.subject,
+                                sender=str(email.sender),
+                                recipient=str(email.recipients[0]) if email.recipients else ""
+                            )
+                            import inspect
+                            if category_result is not None and inspect.iscoroutine(category_result):
+                                category = await category_result
+                            else:
+                                category = category_result
+                            if isinstance(category, str) and category.strip().lower() == 'tasks':
+                                email.set_email_type(EmailType.TASKS)
+                            else:
+                                email.set_email_type(EmailType.INBOX)
+                        except Exception as cat_err:
+                            print(f"⚠️ Failed to categorize email: {cat_err}")
+                            email.set_email_type(EmailType.INBOX)
+                    else:
+                        email.set_email_type(EmailType.INBOX)
                     # Store email
                     stored_email = await self.email_repository.save(email)
                     stored_emails.append(stored_email)
