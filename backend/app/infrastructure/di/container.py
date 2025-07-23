@@ -19,6 +19,7 @@ from ..repositories.firestore_user_repository import FirestoreUserRepository
 from ..repositories.firestore_oauth_repository import FirestoreOAuthRepository
 from ..repositories.firestore_category_repository import FirestoreCategoryRepository
 from ..repositories.firestore_user_account_repository import FirestoreUserAccountRepository
+from ..repositories.firestore_user_profile_repository import FirestoreUserProfileRepository
 
 # Domain
 from ...domain.repositories.email_repository import EmailRepository
@@ -26,6 +27,7 @@ from ...domain.repositories.user_repository import UserRepository
 from ...domain.repositories.oauth_repository import OAuthRepository
 from ...domain.repositories.category_repository import CategoryRepository
 from ...domain.repositories.user_account_repository import UserAccountRepository
+from ...domain.repositories.user_profile_repository import UserProfileRepository
 
 # Application
 from ...application.use_cases.email_use_cases import (
@@ -75,6 +77,7 @@ class Container:
         self._oauth_repository: Optional[OAuthRepository] = None
         self._category_repository: Optional[CategoryRepository] = None
         self._user_account_repository: Optional[UserAccountRepository] = None
+        self._user_profile_repository: Optional[UserProfileRepository] = None
         
         # Email use cases
         self._create_email_use_case: Optional[CreateEmailUseCase] = None
@@ -89,6 +92,7 @@ class Container:
         self._summarize_email_use_case: Optional[SummarizeEmailUseCase] = None
         self._summarize_multiple_emails_use_case: Optional[SummarizeMultipleEmailsUseCase] = None
         self._fetch_starred_emails_use_case: Optional[FetchStarredEmailsUseCase] = None
+        self._fetch_sent_emails_use_case: Optional[__import__('app.application.use_cases.email_use_cases', fromlist=['FetchSentEmailsUseCase']).FetchSentEmailsUseCase] = None
         
         # User use cases
         self._create_user_use_case: Optional[CreateUserUseCase] = None
@@ -231,6 +235,14 @@ class Container:
             self._user_account_repository = FirestoreUserAccountRepository(db)
         return self._user_account_repository
     
+    def user_profile_repository(self) -> UserProfileRepository:
+        """Get user profile repository"""
+        if self._user_profile_repository is None:
+            firebase = self.firebase_service()
+            db = firebase.get_firestore_client()
+            self._user_profile_repository = FirestoreUserProfileRepository(db)
+        return self._user_profile_repository
+    
     # Email Use Cases
     def create_email_use_case(self) -> CreateEmailUseCase:
         """Get create email use case"""
@@ -339,6 +351,31 @@ class Container:
             print(f"🔧 DEBUG: [Container] Returning existing FetchStarredEmailsUseCase")
         return self._fetch_starred_emails_use_case
     
+    def fetch_sent_emails_use_case(self):
+        """Get fetch sent emails use case"""
+        if not hasattr(self, '_fetch_sent_emails_use_case') or self._fetch_sent_emails_use_case is None:
+            print(f"🔧 DEBUG: [Container] Creating FetchSentEmailsUseCase")
+            email_repo = self.email_repository()
+            gmail_svc = self.gmail_service()
+            llm_svc = self.llm_service()
+            user_profile_repo = self.user_profile_repository()
+            print(f"�� DEBUG: [Container] Creating FetchSentEmailsUseCase with:")
+            print(f"   - email_repository: {type(email_repo).__name__}")
+            print(f"   - gmail_service: {type(gmail_svc).__name__}")
+            print(f"   - llm_service: {type(llm_svc).__name__}")
+            print(f"   - user_profile_repository: {type(user_profile_repo).__name__}")
+            self._fetch_sent_emails_use_case = __import__('app.application.use_cases.email_use_cases', fromlist=['FetchSentEmailsUseCase']).FetchSentEmailsUseCase(
+                email_repo,
+                gmail_svc,
+                llm_svc,
+                self.category_repository(),
+                user_profile_repo
+            )
+            print(f"🔧 DEBUG: [Container] FetchSentEmailsUseCase created successfully")
+        else:
+            print(f"�� DEBUG: [Container] Returning existing FetchSentEmailsUseCase")
+        return self._fetch_sent_emails_use_case
+    
     def summarize_email_use_case(self) -> SummarizeEmailUseCase:
         """Get summarize email use case"""
         if self._summarize_email_use_case is None:
@@ -413,18 +450,21 @@ class Container:
             oauth_repository = self.oauth_repository()
             user_repository = self.user_repository()
             fetch_emails_use_case = self.fetch_initial_emails_use_case()
+            fetch_sent_emails_use_case = self.fetch_sent_emails_use_case()
             
             print(f"🔧 Creating ProcessOAuthCallbackUseCase with:")
             print(f"   - oauth_service: {type(oauth_service).__name__}")
             print(f"   - oauth_repository: {type(oauth_repository).__name__}")
             print(f"   - user_repository: {type(user_repository).__name__}")
             print(f"   - fetch_emails_use_case: {type(fetch_emails_use_case).__name__}")
+            print(f"   - fetch_sent_emails_use_case: {type(fetch_sent_emails_use_case).__name__}")
             
             self._process_oauth_callback_use_case = ProcessOAuthCallbackUseCase(
                 oauth_repository=oauth_repository,
                 user_repository=user_repository,
                 oauth_service=oauth_service,
                 fetch_emails_use_case=fetch_emails_use_case,
+                fetch_sent_emails_use_case=fetch_sent_emails_use_case,
                 user_account_repository=self.user_account_repository()
             )
         return self._process_oauth_callback_use_case
@@ -467,6 +507,7 @@ class Container:
                 user_repository=self.user_repository(),
                 oauth_service=self.google_oauth_service(),
                 fetch_emails_use_case=self.fetch_initial_emails_use_case(),
+                fetch_sent_emails_use_case=self.fetch_sent_emails_use_case(),
                 user_account_repository=self.user_account_repository()
             )
         return self._add_another_account_use_case

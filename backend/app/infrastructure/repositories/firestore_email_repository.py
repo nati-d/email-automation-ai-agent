@@ -88,20 +88,25 @@ class FirestoreEmailRepository(EmailRepository):
         return email
     
     async def save(self, email: Email) -> Email:
-        """Save an email to Firestore"""
+        """Save an email to Firestore. Sent emails go to 'sent_email' collection."""
         doc_data = self._entity_to_doc(email)
         doc_data["created_at"] = firestore.SERVER_TIMESTAMP
         doc_data["updated_at"] = firestore.SERVER_TIMESTAMP
-        
+
+        # Use 'sent_email' collection for sent emails
+        if email.email_type == EmailType.SENT:
+            collection_name = "sent_email"
+        else:
+            collection_name = self.collection_name
+
         if email.id:
             # Update existing email
-            doc_ref = self.db.collection(self.collection_name).document(email.id)
+            doc_ref = self.db.collection(collection_name).document(email.id)
             doc_ref.set(doc_data)
         else:
             # Create new email
-            doc_ref = self.db.collection(self.collection_name).add(doc_data)
+            doc_ref = self.db.collection(collection_name).add(doc_data)
             email.id = doc_ref[1].id
-        
         return email
     
     async def find_by_id(self, email_id: str) -> Optional[Email]:

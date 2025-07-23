@@ -21,7 +21,7 @@ class FirestoreUserRepository(UserRepository):
     
     def _entity_to_doc(self, user: User) -> dict:
         """Convert user entity to Firestore document"""
-        return {
+        doc = {
             "email": str(user.email),
             "name": user.name,
             "role": user.role.value,
@@ -33,12 +33,14 @@ class FirestoreUserRepository(UserRepository):
             "profile_picture": user.profile_picture,
             "oauth_provider": user.oauth_provider
         }
+        if user.user_profile is not None:
+            doc["user_profile"] = user.user_profile
+        return doc
     
     def _doc_to_entity(self, doc_id: str, doc_data: dict) -> User:
         """Convert Firestore document to user entity"""
         email = EmailAddress.create(doc_data["email"])
         role = UserRole(doc_data["role"])
-        
         user = User(
             email=email,
             name=doc_data["name"],
@@ -47,14 +49,13 @@ class FirestoreUserRepository(UserRepository):
             last_login=doc_data.get("last_login"),
             google_id=doc_data.get("google_id"),
             profile_picture=doc_data.get("profile_picture"),
-            oauth_provider=doc_data.get("oauth_provider")
+            oauth_provider=doc_data.get("oauth_provider"),
+            user_profile=doc_data.get("user_profile")
         )
-        
         # Set entity ID and timestamps
         user.id = doc_id
         user.created_at = doc_data.get("created_at")
         user.updated_at = doc_data.get("updated_at")
-        
         return user
     
     async def save(self, user: User) -> User:

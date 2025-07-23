@@ -285,6 +285,11 @@
                 </button>
             </div>
         </div>
+        <!-- Sent Emails Section -->
+        <div class="user-info" id="sent-emails-section" style="display:none; margin-top: 30px;">
+            <h3>📤 Sent Emails</h3>
+            <div id="sent-emails-list">Loading sent emails...</div>
+        </div>
     </div>
 
     <script>
@@ -330,23 +335,59 @@
                 return;
             }
             
-            if (urlParams.get('status') === 'success') {
-                // Authentication successful
-                const userData = {
-                    name: urlParams.get('name'),
-                    email: urlParams.get('email'),
-                    id: urlParams.get('user_id'),
-                    isNewUser: urlParams.get('is_new_user') === 'true'
-                };
-                
-                // Store session ID for logout
-                sessionId = urlParams.get('session_id');
-                
-                showUserInfo(userData);
-                showSuccess('Authentication successful! Welcome ' + userData.name);
-                
-                // Clean URL
-                window.history.replaceState({}, document.title, window.location.pathname);
+                            if (urlParams.get('status') === 'success') {
+                    // Authentication successful
+                    const userData = {
+                        name: urlParams.get('name'),
+                        email: urlParams.get('email'),
+                        id: urlParams.get('user_id'),
+                        isNewUser: urlParams.get('is_new_user') === 'true'
+                    };
+                    
+                    // Store session ID for logout
+                    sessionId = urlParams.get('session_id');
+                    
+                    showUserInfo(userData);
+                    
+                    // Show welcome message with email import info for new users
+                    let welcomeMessage = 'Authentication successful! Welcome ' + userData.name;
+                    if (userData.isNewUser) {
+                        const emailImport = urlParams.get('email_import');
+                        const sentEmailImport = urlParams.get('sent_email_import');
+                        
+                        if (emailImport) {
+                            try {
+                                const emailData = JSON.parse(decodeURIComponent(emailImport));
+                                if (emailData.success) {
+                                    welcomeMessage += `\nImported ${emailData.emails_imported} inbox emails`;
+                                    if (emailData.emails_summarized) {
+                                        welcomeMessage += ` (${emailData.emails_summarized} summarized)`;
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Could not parse email import data:', e);
+                            }
+                        }
+                        
+                        if (sentEmailImport) {
+                            try {
+                                const sentEmailData = JSON.parse(decodeURIComponent(sentEmailImport));
+                                if (sentEmailData.success) {
+                                    welcomeMessage += `\nImported ${sentEmailData.emails_imported} sent emails`;
+                                    if (sentEmailData.emails_summarized) {
+                                        welcomeMessage += ` (${sentEmailData.emails_summarized} summarized)`;
+                                    }
+                                }
+                            } catch (e) {
+                                console.log('Could not parse sent email import data:', e);
+                            }
+                        }
+                    }
+                    
+                    showSuccess(welcomeMessage);
+                    
+                    // Clean URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
                 
             } else if (urlParams.get('error')) {
                 // Authentication failed
@@ -440,6 +481,8 @@
             
             // Fetch connected accounts information
             fetchConnectedAccounts();
+            // Fetch and display sent emails
+            fetchSentEmails();
         }
 
         // Show login section
@@ -528,9 +571,18 @@
                     
                     let message = `Successfully added account: ${accountAdded.email}`;
                     if (emailImport && emailImport.success) {
-                        message += `\nImported ${emailImport.emails_imported} emails`;
+                        message += `\nImported ${emailImport.emails_imported} inbox emails`;
                         if (emailImport.emails_summarized) {
                             message += ` (${emailImport.emails_summarized} summarized)`;
+                        }
+                    }
+                    
+                    // Add sent email import results
+                    const sentEmailImport = data.sent_email_import;
+                    if (sentEmailImport && sentEmailImport.success) {
+                        message += `\nImported ${sentEmailImport.emails_imported} sent emails`;
+                        if (sentEmailImport.emails_summarized) {
+                            message += ` (${sentEmailImport.emails_summarized} summarized)`;
                         }
                     }
                     
@@ -750,6 +802,40 @@
                 showError('Failed to fetch user accounts: ' + error.message);
             } finally {
                 showLoading(false);
+            }
+        }
+
+        // Fetch and display sent emails
+        async function fetchSentEmails() {
+            const sentSection = document.getElementById('sent-emails-section');
+            const sentList = document.getElementById('sent-emails-list');
+            sentSection.style.display = 'block';
+            sentList.textContent = 'Loading sent emails...';
+            if (!sessionId) {
+                sentList.textContent = 'No session. Please log in.';
+                return;
+            }
+            try {
+                const response = await fetch(`${API_BASE}/emails/sent`, {
+                    headers: {
+                        'Authorization': `Bearer ${sessionId}`
+                    }
+                });
+                const data = await response.json();
+                if (response.ok && data.emails && data.emails.length > 0) {
+                    sentList.innerHTML = data.emails.map(email =>
+                        `<div style='margin-bottom:12px; padding:10px; border-bottom:1px solid #eee;'>
+                            <strong>To:</strong> ${Array.isArray(email.recipients) ? email.recipients.join(', ') : email.recipients}<br>
+                            <strong>Subject:</strong> ${email.subject}<br>
+                            <strong>Date:</strong> ${email.sent_at ? new Date(email.sent_at).toLocaleString() : '-'}<br>
+                            <span style='color:#666;'>${email.content ? email.content.substring(0, 120) : ''}${email.content && email.content.length > 120 ? '...' : ''}</span>
+                        </div>`
+                    ).join('');
+                } else {
+                    sentList.textContent = 'No sent emails found.';
+                }
+            } catch (error) {
+                sentList.textContent = 'Failed to fetch sent emails.';
             }
         }
     </script>

@@ -28,6 +28,7 @@ class EmailType(Enum):
     """Email type enumeration"""
     INBOX = "inbox"
     TASKS = "tasks"
+    SENT = "sent"
 
 
 @dataclass

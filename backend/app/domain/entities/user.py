@@ -5,7 +5,7 @@ Core business object representing a user.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
@@ -35,6 +35,7 @@ class User(BaseEntity):
     google_id: Optional[str] = None
     profile_picture: Optional[str] = None
     oauth_provider: Optional[str] = None
+    user_profile: Optional[Dict[str, Any]] = None  # LLM-generated profile
     
     def __post_init__(self):
         """Initialize User entity and validate"""

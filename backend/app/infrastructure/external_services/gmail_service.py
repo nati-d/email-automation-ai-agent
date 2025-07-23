@@ -160,6 +160,68 @@ class GmailService:
             print(f"❌ Gmail starred fetch traceback: {traceback.format_exc()}")
             raise Exception(f"Failed to fetch starred emails from Gmail: {str(e)}")
     
+    async def fetch_sent_emails(self, oauth_token: OAuthToken, user_email: str, limit: int = 50) -> List[Email]:
+        """Fetch sent emails from user's Gmail account"""
+        try:
+            print(f"🔄 GmailService.fetch_sent_emails called:")
+            print(f"   - user_email: {user_email}")
+            print(f"   - limit: {limit}")
+            print(f"   - oauth_token.access_token: {oauth_token.access_token[:20] if oauth_token.access_token else 'None'}...")
+            print(f"   - oauth_token.scope: {oauth_token.scope}")
+            
+            # Create Gmail service
+            print("🔄 Creating Google credentials...")
+            credentials = self._create_credentials(oauth_token)
+            print(f"🔧 Credentials created - token: {credentials.token[:20] if credentials.token else 'None'}...")
+            
+            print("🔄 Building Gmail service...")
+            service = build(self.service_name, self.version, credentials=credentials)
+            print("✅ Gmail service built successfully")
+            
+            # Get list of sent messages
+            print("🔄 Getting sent message list from Gmail...")
+            result = service.users().messages().list(
+                userId='me',
+                maxResults=limit,
+                q='in:sent'  # Only sent messages
+            ).execute()
+            
+            messages = result.get('messages', [])
+            print(f"✅ Found {len(messages)} sent messages to fetch")
+            
+            emails = []
+            user_email_address = EmailAddress.create(user_email)
+            
+            for i, message in enumerate(messages[:limit]):
+                try:
+                    print(f"🔄 Fetching sent message {i+1}/{len(messages)}: {message['id']}")
+                    
+                    # Get full message
+                    msg = service.users().messages().get(
+                        userId='me',
+                        id=message['id'],
+                        format='full'
+                    ).execute()
+                    
+                    # Parse email
+                    email_obj = self._parse_gmail_message(msg, user_email_address)
+                    if email_obj:
+                        emails.append(email_obj)
+                        print(f"✅ Parsed sent email: {email_obj.subject[:50]}...")
+                    
+                except Exception as e:
+                    print(f"⚠️ Failed to fetch sent message {message['id']}: {str(e)}")
+                    continue
+            
+            print(f"✅ Successfully fetched {len(emails)} sent emails")
+            return emails
+            
+        except Exception as e:
+            print(f"❌ Failed to fetch sent emails from Gmail: {str(e)}")
+            import traceback
+            print(f"❌ Gmail fetch traceback: {traceback.format_exc()}")
+            raise Exception(f"Failed to fetch sent emails from Gmail: {str(e)}")
+    
     def _parse_gmail_message(self, gmail_msg: Dict[str, Any], user_email: EmailAddress) -> Optional[Email]:
         """Parse Gmail message into our Email entity"""
         try:

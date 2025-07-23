@@ -215,7 +215,7 @@ async def google_oauth_callback(
             if session_id:
                 redirect_params.append(f"session_id={session_id}")
             
-            redirect_url = f"{settings.frontend_url}/?{'&'.join(redirect_params)}"
+            redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
             print(f"✅ Add account OAuth successful! Redirecting to: {redirect_url}")
             return RedirectResponse(url=redirect_url)
         
@@ -255,8 +255,21 @@ async def google_oauth_callback(
             redirect_params.append(f"email_import_success={str(email_import.get('success', False)).lower()}")
             if email_import.get('error'):
                 redirect_params.append(f"email_import_error={email_import['error'][:100]}")  # Truncate error
+            # Add full email import data for frontend parsing
+            import json
+            redirect_params.append(f"email_import={json.dumps(email_import)}")
         
-        redirect_url = f"{settings.frontend_url}/auth-success?{'&'.join(redirect_params)}"
+        # Add sent email import results if available
+        if "sent_email_import" in result:
+            sent_email_import = result["sent_email_import"]
+            redirect_params.append(f"sent_emails_imported={sent_email_import.get('emails_imported', 0)}")
+            redirect_params.append(f"sent_email_import_success={str(sent_email_import.get('success', False)).lower()}")
+            if sent_email_import.get('error'):
+                redirect_params.append(f"sent_email_import_error={sent_email_import['error'][:100]}")  # Truncate error
+            # Add full sent email import data for frontend parsing
+            redirect_params.append(f"sent_email_import={json.dumps(sent_email_import)}")
+        
+        redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
         print(f"✅ OAuth authentication successful! Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)
         
