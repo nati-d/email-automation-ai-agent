@@ -249,7 +249,7 @@ async def google_oauth_callback(
         ]
         
         # Add email import results if available
-        if "email_import" in result:
+        if "email_import" in result and result["email_import"] is not None:
             email_import = result["email_import"]
             redirect_params.append(f"emails_imported={email_import.get('emails_imported', 0)}")
             redirect_params.append(f"email_import_success={str(email_import.get('success', False)).lower()}")
@@ -258,9 +258,13 @@ async def google_oauth_callback(
             # Add full email import data for frontend parsing
             import json
             redirect_params.append(f"email_import={json.dumps(email_import)}")
+        else:
+            # Set default values for existing users
+            redirect_params.append(f"emails_imported=0")
+            redirect_params.append(f"email_import_success=true")
         
         # Add sent email import results if available
-        if "sent_email_import" in result:
+        if "sent_email_import" in result and result["sent_email_import"] is not None:
             sent_email_import = result["sent_email_import"]
             redirect_params.append(f"sent_emails_imported={sent_email_import.get('emails_imported', 0)}")
             redirect_params.append(f"sent_email_import_success={str(sent_email_import.get('success', False)).lower()}")
@@ -268,6 +272,10 @@ async def google_oauth_callback(
                 redirect_params.append(f"sent_email_import_error={sent_email_import['error'][:100]}")  # Truncate error
             # Add full sent email import data for frontend parsing
             redirect_params.append(f"sent_email_import={json.dumps(sent_email_import)}")
+        else:
+            # Set default values for existing users
+            redirect_params.append(f"sent_emails_imported=0")
+            redirect_params.append(f"sent_email_import_success=true")
         
         redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
         print(f"✅ OAuth authentication successful! Redirecting to: {redirect_url}")

@@ -223,99 +223,114 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
                         print(f"⚠️ Failed to create primary account entry: {str(e)}")
                         # Don't fail the whole flow for this
                 
-                # Fetch emails for new users
-                try:
-                    # Fetch sent emails for new users
-                    if self.fetch_sent_emails_use_case:
-                        try:
-                            print("🔄 Fetching sent emails for new user...")
-                            print(f"🔧 DEBUG: fetch_sent_emails_use_case type: {type(self.fetch_sent_emails_use_case).__name__}")
-                            
-                            sent_email_result = await self.fetch_sent_emails_use_case.execute(
-                                oauth_token=token,
-                                user_email=user.email.value,
-                                limit=10
-                            )
-                            result["sent_email_import"] = sent_email_result
-                            print(f"✅ Sent email import result: {sent_email_result}")
-                            print(f"📊 Sent emails imported: {sent_email_result.get('emails_imported', 0)}")
-                            print(f"📊 Sent emails summarized: {sent_email_result.get('emails_summarized', 0)}")
-                        except Exception as e:
-                            print(f"⚠️ Failed to fetch sent emails, but continuing: {str(e)}")
-                            print(f"⚠️ Sent email fetch error type: {type(e).__name__}")
-                            import traceback
-                            print(f"⚠️ Sent email fetch traceback: {traceback.format_exc()}")
-                            result["sent_email_import"] = {
-                                "success": False,
-                                "error": str(e),
-                                "message": "Failed to import sent emails but registration succeeded"
-                            }
-                    else:
-                        print("⚠️ Skipping sent email fetch - fetch_sent_emails_use_case is None")
-                    
-                    # --- NEW: Aggregate all emails and update user profile using LLM ---
+                # Fetch emails for new users only
+                if is_new_user:
                     try:
-                        from app.infrastructure.di.container import get_container
-                        container = get_container()
-                        user_repo = container.user_repository()
-                        email_repo = container.email_repository()
-                        llm_service = container.llm_service()
-                        # Fetch all emails (inbox + sent) for the user
-                        all_emails = await email_repo.find_by_sender(user.email.value)
-                        all_emails += await email_repo.find_by_recipient(user.email.value)
-                        email_samples = []
-                        for email in all_emails:
-                            email_samples.append({
-                                "subject": email.subject,
-                                "body": email.body,
-                                "summary": email.summary,
-                                "sentiment": email.sentiment,
-                                "main_concept": email.main_concept,
-                                "key_topics": email.key_topics
-                            })
-                        prompt = (
-                            "Analyze the following list of emails (inbox and sent) and generate a JSON user profile that describes "
-                            "the user's typical tone, writing style, common structures, and favorite phrases. "
-                            "Be concise and helpful. Respond ONLY with valid JSON in this format: "
-                            '{"dominant_tone": "string", "tone_distribution": {"tone": count, ...}, "common_structures": ["structure1", ...], "favorite_phrases": ["phrase1", ...], "summary": "A helpful summary of the user\'s email style."}'
-                            "\n\nEmails: " + str(email_samples)
-                        )
+                        # Fetch sent emails for new users
+                        if self.fetch_sent_emails_use_case:
+                            try:
+                                print("🔄 Fetching sent emails for new user...")
+                                print(f"🔧 DEBUG: fetch_sent_emails_use_case type: {type(self.fetch_sent_emails_use_case).__name__}")
+                                
+                                sent_email_result = await self.fetch_sent_emails_use_case.execute(
+                                    oauth_token=token,
+                                    user_email=user.email.value,
+                                    limit=10
+                                )
+                                result["sent_email_import"] = sent_email_result
+                                print(f"✅ Sent email import result: {sent_email_result}")
+                                print(f"📊 Sent emails imported: {sent_email_result.get('emails_imported', 0)}")
+                                print(f"📊 Sent emails summarized: {sent_email_result.get('emails_summarized', 0)}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to fetch sent emails, but continuing: {str(e)}")
+                                print(f"⚠️ Sent email fetch error type: {type(e).__name__}")
+                                import traceback
+                                print(f"⚠️ Sent email fetch traceback: {traceback.format_exc()}")
+                                result["sent_email_import"] = {
+                                    "success": False,
+                                    "error": str(e),
+                                    "message": "Failed to import sent emails but registration succeeded"
+                                }
+                        else:
+                            print("⚠️ Skipping sent email fetch - fetch_sent_emails_use_case is None")
+                        
+                        # --- NEW: Aggregate all emails and update user profile using LLM ---
                         try:
-                            llm_response = llm_service.generate_content(
-                                system_instruction="You are an expert at analyzing email writing style and generating user profiles.",
-                                query=prompt,
-                                response_type="text/plain"
+                            from app.infrastructure.di.container import get_container
+                            container = get_container()
+                            user_repo = container.user_repository()
+                            email_repo = container.email_repository()
+                            llm_service = container.llm_service()
+                            # Fetch all emails (inbox + sent) for the user
+                            all_emails = await email_repo.find_by_sender(user.email.value)
+                            all_emails += await email_repo.find_by_recipient(user.email.value)
+                            email_samples = []
+                            for email in all_emails:
+                                email_samples.append({
+                                    "subject": email.subject,
+                                    "body": email.body,
+                                    "summary": email.summary,
+                                    "sentiment": email.sentiment,
+                                    "main_concept": email.main_concept,
+                                    "key_topics": email.key_topics
+                                })
+                            prompt = (
+                                "Analyze the following list of emails (inbox and sent) and generate a JSON user profile that describes "
+                                "the user's typical tone, writing style, common structures, and favorite phrases. "
+                                "Be concise and helpful. Respond ONLY with valid JSON in this format: "
+                                '{"dominant_tone": "string", "tone_distribution": {"tone": count, ...}, "common_structures": ["structure1", ...], "favorite_phrases": ["phrase1", ...], "summary": "A helpful summary of the user\'s email style."}'
+                                "\n\nEmails: " + str(email_samples)
                             )
-                            import json
-                            import re
-                            llm_response_clean = llm_response.strip()
-                            if llm_response_clean.startswith('```'):
-                                llm_response_clean = re.sub(r'^```[a-zA-Z]*\n', '', llm_response_clean)
-                                llm_response_clean = re.sub(r'```$', '', llm_response_clean)
-                            profile_data = json.loads(llm_response_clean)
-                            print(f"[DEBUG] LLM profile_data to be saved (onboarding): {profile_data}")
-                            user.user_profile = profile_data
-                            print(f"[DEBUG] About to update user {user.email} with profile: {user.user_profile}")
-                            await user_repo.update(user)
-                            print(f"[DEBUG] User profile (LLM, all emails) updated for user: {user.email}")
+                            try:
+                                llm_response = llm_service.generate_content(
+                                    system_instruction="You are an expert at analyzing email writing style and generating user profiles.",
+                                    query=prompt,
+                                    response_type="text/plain"
+                                )
+                                import json
+                                import re
+                                llm_response_clean = llm_response.strip()
+                                if llm_response_clean.startswith('```'):
+                                    llm_response_clean = re.sub(r'^```[a-zA-Z]*\n', '', llm_response_clean)
+                                    llm_response_clean = re.sub(r'```$', '', llm_response_clean)
+                                profile_data = json.loads(llm_response_clean)
+                                print(f"[DEBUG] LLM profile_data to be saved (onboarding): {profile_data}")
+                                user.user_profile = profile_data
+                                print(f"[DEBUG] About to update user {user.email} with profile: {user.user_profile}")
+                                await user_repo.update(user)
+                                print(f"[DEBUG] User profile (LLM, all emails) updated for user: {user.email}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to generate user profile with LLM (onboarding): {e}")
+                                user.user_profile = {"test": "value", "error": str(e)}
+                                print(f"[DEBUG] About to update user {user.email} with fallback profile: {user.user_profile}")
+                                await user_repo.update(user)
+                                print(f"[DEBUG] Fallback user_profile set for user: {user.email}")
                         except Exception as e:
-                            print(f"⚠️ Failed to generate user profile with LLM (onboarding): {e}")
-                            user.user_profile = {"test": "value", "error": str(e)}
-                            print(f"[DEBUG] About to update user {user.email} with fallback profile: {user.user_profile}")
-                            await user_repo.update(user)
-                            print(f"[DEBUG] Fallback user_profile set for user: {user.email}")
+                            print(f"⚠️ [DEBUG] Failed to aggregate and store user profile after onboarding: {e}")
+                        # --- END NEW ---
                     except Exception as e:
-                        print(f"⚠️ [DEBUG] Failed to aggregate and store user profile after onboarding: {e}")
-                    # --- END NEW ---
-                except Exception as e:
-                    print(f"⚠️ Failed to fetch initial emails, but continuing: {str(e)}")
-                    print(f"⚠️ Email fetch error type: {type(e).__name__}")
-                    import traceback
-                    print(f"⚠️ Email fetch traceback: {traceback.format_exc()}")
+                        print(f"⚠️ Failed to fetch initial emails, but continuing: {str(e)}")
+                        print(f"⚠️ Email fetch error type: {type(e).__name__}")
+                        import traceback
+                        print(f"⚠️ Email fetch traceback: {traceback.format_exc()}")
+                        result["email_import"] = {
+                            "success": False,
+                            "error": str(e),
+                            "message": "Failed to import emails but registration succeeded"
+                        }
+                else:
+                    print("ℹ️ Skipping email fetch and profile generation - existing user")
                     result["email_import"] = {
-                        "success": False,
-                        "error": str(e),
-                        "message": "Failed to import emails but registration succeeded"
+                        "success": True,
+                        "emails_imported": 0,
+                        "emails_summarized": 0,
+                        "message": "Skipped for existing user"
+                    }
+                    result["sent_email_import"] = {
+                        "success": True,
+                        "emails_imported": 0,
+                        "emails_summarized": 0,
+                        "message": "Skipped for existing user"
                     }
                 
                 # For new users, ensure primary account is added to user accounts list
@@ -748,58 +763,62 @@ class AddAnotherAccountUseCase(OAuthUseCaseBase):
                 }
             
             # After fetching emails and sent emails, aggregate all emails for the user and update user_profile
-            try:
-                from app.infrastructure.di.container import get_container
-                container = get_container()
-                user_repo = container.user_repository()
-                email_repo = container.email_repository()
-                llm_service = container.llm_service()
-                # Fetch all emails (inbox + sent) for the user
-                all_emails = await email_repo.find_by_sender(existing_user.email.value)
-                all_emails += await email_repo.find_by_recipient(existing_user.email.value)
-                email_samples = []
-                for email in all_emails:
-                    email_samples.append({
-                        "subject": email.subject,
-                        "body": email.body,
-                        "summary": email.summary,
-                        "sentiment": email.sentiment,
-                        "main_concept": email.main_concept,
-                        "key_topics": email.key_topics
-                    })
-                prompt = (
-                    "Analyze the following list of emails (inbox and sent) and generate a JSON user profile that describes "
-                    "the user's typical tone, writing style, common structures, and favorite phrases. "
-                    "Be concise and helpful. Respond ONLY with valid JSON in this format: "
-                    '{"dominant_tone": "string", "tone_distribution": {"tone": count, ...}, "common_structures": ["structure1", ...], "favorite_phrases": ["phrase1", ...], "summary": "A helpful summary of the user\'s email style."}'
-                    "\n\nEmails: " + str(email_samples)
-                )
+            # Only regenerate profile if new emails were actually fetched
+            if not account_exists and (email_result or sent_email_result):
                 try:
-                    llm_response = llm_service.generate_content(
-                        system_instruction="You are an expert at analyzing email writing style and generating user profiles.",
-                        query=prompt,
-                        response_type="text/plain"
+                    from app.infrastructure.di.container import get_container
+                    container = get_container()
+                    user_repo = container.user_repository()
+                    email_repo = container.email_repository()
+                    llm_service = container.llm_service()
+                    # Fetch all emails (inbox + sent) for the user
+                    all_emails = await email_repo.find_by_sender(existing_user.email.value)
+                    all_emails += await email_repo.find_by_recipient(existing_user.email.value)
+                    email_samples = []
+                    for email in all_emails:
+                        email_samples.append({
+                            "subject": email.subject,
+                            "body": email.body,
+                            "summary": email.summary,
+                            "sentiment": email.sentiment,
+                            "main_concept": email.main_concept,
+                            "key_topics": email.key_topics
+                        })
+                    prompt = (
+                        "Analyze the following list of emails (inbox and sent) and generate a JSON user profile that describes "
+                        "the user's typical tone, writing style, common structures, and favorite phrases. "
+                        "Be concise and helpful. Respond ONLY with valid JSON in this format: "
+                        '{"dominant_tone": "string", "tone_distribution": {"tone": count, ...}, "common_structures": ["structure1", ...], "favorite_phrases": ["phrase1", ...], "summary": "A helpful summary of the user\'s email style."}'
+                        "\n\nEmails: " + str(email_samples)
                     )
-                    import json
-                    import re
-                    llm_response_clean = llm_response.strip()
-                    if llm_response_clean.startswith('```'):
-                        llm_response_clean = re.sub(r'^```[a-zA-Z]*\n', '', llm_response_clean)
-                        llm_response_clean = re.sub(r'```$', '', llm_response_clean)
-                    profile_data = json.loads(llm_response_clean)
-                    print(f"[DEBUG] LLM profile_data to be saved (add account): {profile_data}")
-                    existing_user.user_profile = profile_data
-                    print(f"[DEBUG] About to update user {existing_user.email} with profile: {existing_user.user_profile}")
-                    await user_repo.update(existing_user)
-                    print(f"[DEBUG] User profile (LLM, all emails) updated for user: {existing_user.email}")
+                    try:
+                        llm_response = llm_service.generate_content(
+                            system_instruction="You are an expert at analyzing email writing style and generating user profiles.",
+                            query=prompt,
+                            response_type="text/plain"
+                        )
+                        import json
+                        import re
+                        llm_response_clean = llm_response.strip()
+                        if llm_response_clean.startswith('```'):
+                            llm_response_clean = re.sub(r'^```[a-zA-Z]*\n', '', llm_response_clean)
+                            llm_response_clean = re.sub(r'```$', '', llm_response_clean)
+                        profile_data = json.loads(llm_response_clean)
+                        print(f"[DEBUG] LLM profile_data to be saved (add account): {profile_data}")
+                        existing_user.user_profile = profile_data
+                        print(f"[DEBUG] About to update user {existing_user.email} with profile: {existing_user.user_profile}")
+                        await user_repo.update(existing_user)
+                        print(f"[DEBUG] User profile (LLM, all emails) updated for user: {existing_user.email}")
+                    except Exception as e:
+                        print(f"⚠️ Failed to generate user profile with LLM (add account): {e}")
+                        existing_user.user_profile = {"test": "value", "error": str(e)}
+                        print(f"[DEBUG] About to update user {existing_user.email} with fallback profile: {existing_user.user_profile}")
+                        await user_repo.update(existing_user)
+                        print(f"[DEBUG] Fallback user_profile set for user: {existing_user.email}")
                 except Exception as e:
-                    print(f"⚠️ Failed to generate user profile with LLM (add account): {e}")
-                    existing_user.user_profile = {"test": "value", "error": str(e)}
-                    print(f"[DEBUG] About to update user {existing_user.email} with fallback profile: {existing_user.user_profile}")
-                    await user_repo.update(existing_user)
-                    print(f"[DEBUG] Fallback user_profile set for user: {existing_user.email}")
-            except Exception as e:
-                print(f"⚠️ [DEBUG] Failed to aggregate and store user profile after adding account: {e}")
+                    print(f"⚠️ [DEBUG] Failed to aggregate and store user profile after adding account: {e}")
+            else:
+                print(f"ℹ️ [DEBUG] Skipping user profile regeneration - no new emails fetched or account already exists")
             
             result = {
                 "success": True,

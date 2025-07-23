@@ -70,6 +70,88 @@ class GenerateEmailResponseResponse(BaseModel):
     success: bool = Field(..., description="Whether the operation was successful")
 
 
+# Compose Email with User Profile
+class ComposeEmailRequest(BaseModel):
+    text: str = Field(
+        ..., 
+        description="Email text content. Can be either: 1) Original email to reply to, or 2) Partial email text you started writing",
+        min_length=1,
+        max_length=10000
+    )
+    recipients: List[str] = Field(
+        ..., 
+        description="List of recipient email addresses",
+        min_items=1,
+        max_items=10
+    )
+    purpose: Optional[str] = Field(
+        None, 
+        description="Optional purpose or context of the email (if not clear from text). Helps guide the generation.",
+        max_length=500
+    )
+    tone: Optional[str] = Field(
+        "auto", 
+        description="Desired tone for the email. Options: 'auto' (detect from context), 'professional', 'casual', 'formal', 'friendly', 'assertive', 'empathetic'",
+        pattern="^(auto|professional|casual|formal|friendly|assertive|empathetic)$"
+    )
+    additional_context: Optional[str] = Field(
+        "", 
+        description="Additional context or specific requirements for the email generation",
+        max_length=1000
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "text": "Hi John, I received your email about the project proposal. I think we should discuss this further.",
+                "recipients": ["john@company.com"],
+                "purpose": "Reply to project proposal discussion",
+                "tone": "professional",
+                "additional_context": "John is the project manager"
+            }
+        }
+
+
+class ComposeEmailResponse(BaseModel):
+    content: str = Field(
+        ..., 
+        description="The complete generated email content"
+    )
+    subject: Optional[str] = Field(
+        None, 
+        description="Generated subject line (only for started emails, not replies)"
+    )
+    tone_used: str = Field(
+        ..., 
+        description="The tone that was actually used in generation (may differ from requested tone)"
+    )
+    user_profile_used: bool = Field(
+        ..., 
+        description="Whether the user's profile was successfully used in generation"
+    )
+    email_type_detected: str = Field(
+        ..., 
+        description="Type of email detected: 'reply' (responding to existing email) or 'started' (completing partial email)",
+        pattern="^(reply|started)$"
+    )
+    success: bool = Field(
+        ..., 
+        description="Whether the operation was successful"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "content": "Hi John,\n\nThank you for your email about the project proposal. I've reviewed the details and I think we should definitely discuss this further.\n\nI'm particularly interested in the timeline you've outlined and would like to explore how we can align it with our current priorities.\n\nWould you be available for a call this week to discuss the next steps?\n\nBest regards,\n[Your Name]",
+                "subject": "Re: Project Proposal Discussion",
+                "tone_used": "professional",
+                "user_profile_used": True,
+                "email_type_detected": "reply",
+                "success": True
+            }
+        }
+
+
 # Gemini Chat
 class GeminiChatRequest(BaseModel):
     system_instruction: str = Field("", description="System instruction for the chat")

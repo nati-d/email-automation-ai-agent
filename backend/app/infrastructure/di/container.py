@@ -60,6 +60,7 @@ from ...application.use_cases.user_account_use_cases import (
     AddAccountIfNotExistsUseCase
 )
 from ...application.use_cases.email_use_cases import FetchStarredEmailsUseCase
+from ...application.use_cases.llm_use_cases import ComposeEmailUseCase
 
 
 class Container:
@@ -115,6 +116,7 @@ class Container:
         self._suggest_email_subject_use_case: Optional[SuggestEmailSubjectUseCase] = None
         self._generate_email_response_use_case: Optional[GenerateEmailResponseUseCase] = None
         self._smart_email_composer_use_case: Optional[SmartEmailComposerUseCase] = None
+        self._compose_email_use_case: Optional[ComposeEmailUseCase] = None
         self._gemini_chat_use_case: Optional[GeminiChatUseCase] = None
         self._gemini_vision_use_case: Optional[GeminiVisionUseCase] = None
         self._gemini_tools_use_case: Optional[GeminiToolsUseCase] = None
@@ -542,6 +544,15 @@ class Container:
         if self._smart_email_composer_use_case is None:
             self._smart_email_composer_use_case = SmartEmailComposerUseCase(self.llm_service())
         return self._smart_email_composer_use_case
+    
+    def compose_email_use_case(self) -> ComposeEmailUseCase:
+        """Get compose email use case"""
+        if self._compose_email_use_case is None:
+            self._compose_email_use_case = ComposeEmailUseCase(
+                llm_service=self.llm_service(),
+                user_repository=self.user_repository()
+            )
+        return self._compose_email_use_case
     
     def gemini_chat_use_case(self) -> GeminiChatUseCase:
         """Get Gemini chat use case"""

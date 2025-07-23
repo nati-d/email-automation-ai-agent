@@ -24,6 +24,8 @@ from ...presentation.models.llm_models import (
     SmartEmailComposerResponse,
     GenerateEmailResponseRequest,
     GenerateEmailResponseResponse,
+    ComposeEmailRequest,
+    ComposeEmailResponse,
     GeminiChatRequest,
     GeminiChatResponse,
     GeminiVisionRequest,
@@ -33,7 +35,15 @@ from ...presentation.models.llm_models import (
     GeminiHealthResponse
 )
 
-router = APIRouter(prefix="/llm", tags=["LLM"])
+router = APIRouter(
+    prefix="/llm", 
+    tags=["LLM"],
+    responses={
+        401: {"description": "Unauthorized - Invalid or missing authentication token"},
+        403: {"description": "Forbidden - Insufficient permissions"},
+        500: {"description": "Internal Server Error - LLM service or processing error"}
+    }
+)
 
 
 @router.post("/generate-email-content", response_model=GenerateEmailContentResponse)
@@ -112,14 +122,36 @@ async def suggest_email_subject(
         raise HTTPException(status_code=500, detail=f"Failed to suggest email subject: {str(e)}")
 
 
-@router.post("/smart-email-composer", response_model=SmartEmailComposerResponse)
+@router.post("/smart-email-composer", 
+            response_model=SmartEmailComposerResponse,
+            summary="Smart Email Composer",
+            description="""
+            Compose a complete email using multiple Gemini features.
+            
+            This endpoint generates both email content and subject line based on:
+            - Purpose of the email
+            - Recipient context
+            - Desired tone
+            - Optional subject line generation
+            
+            ## Features
+            
+            - **Purpose-Driven Generation**: Creates content based on the email's purpose
+            - **Recipient-Aware**: Considers recipient context for appropriate tone
+            - **Tone Control**: Supports various tones (professional, casual, formal, etc.)
+            - **Subject Generation**: Optional automatic subject line creation
+            
+            ## Authentication
+            
+            - **Authorization**: Bearer token (session ID) required in Authorization header
+            - **Example**: `Authorization: Bearer your_session_id_here`
+            """,
+            response_description="Generated email content and subject line",
+            tags=["LLM", "Email Composition"])
 async def smart_email_composer(
     request: SmartEmailComposerRequest,
     current_user: User = Depends(get_current_user)
 ):
-    """
-    Compose a complete email using multiple Gemini features.
-    """
     try:
         container = get_container()
         use_case = container.smart_email_composer_use_case()
@@ -164,6 +196,127 @@ async def generate_email_response(
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate email response: {str(e)}")
+
+
+@router.post("/compose-email", 
+            response_model=ComposeEmailResponse,
+            summary="Compose Email with User Profile",
+            description="""
+            Compose an email using the user's profile and preferences.
+            
+            This endpoint automatically detects whether the input text is:
+            - **A reply to an existing email** (detects reply indicators like "Re:", "Thank you for your email", etc.)
+            - **A partial email text** that you started writing (completes the email naturally)
+            
+            The endpoint uses the user's profile to match their typical writing style, tone, and favorite phrases.
+            
+            ## Features
+            
+            - **Automatic Email Type Detection**: Determines if input is a reply or started email
+            - **User Profile Integration**: Uses your writing style, tone, and favorite phrases
+            - **Smart Tone Selection**: Can auto-detect tone or use specified tone
+            - **Context-Aware Generation**: Considers recipients and purpose
+            
+            ## Authentication
+            
+            - **Authorization**: Bearer token (session ID) required in Authorization header
+            - **Example**: `Authorization: Bearer your_session_id_here`
+            
+            ## Usage Examples
+            
+            ### Reply to an Email
+            ```json
+            {
+                "text": "Hi John, I received your email about the project proposal. I think we should discuss this further.",
+                "recipients": ["john@company.com"],
+                "purpose": "Reply to project proposal discussion",
+                "tone": "professional",
+                "additional_context": "John is the project manager"
+            }
+            ```
+            
+            ### Complete a Started Email
+            ```json
+            {
+                "text": "Dear Sarah,",
+                "recipients": ["sarah@company.com"],
+                "purpose": "Request for meeting",
+                "tone": "friendly",
+                "additional_context": "Need to schedule a 30-minute meeting next week"
+            }
+            ```
+            """,
+            response_description="Generated email content with metadata",
+            responses={
+                200: {
+                    "description": "Email composed successfully",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "content": "Hi John,\n\nThank you for your email about the project proposal. I've reviewed the details and I think we should definitely discuss this further.\n\nI'm particularly interested in the timeline you've outlined and would like to explore how we can align it with our current priorities.\n\nWould you be available for a call this week to discuss the next steps?\n\nBest regards,\n[Your Name]",
+                                "subject": "Re: Project Proposal Discussion",
+                                "tone_used": "professional",
+                                "user_profile_used": True,
+                                "email_type_detected": "reply",
+                                "success": True
+                            }
+                        }
+                    }
+                },
+                400: {
+                    "description": "Bad Request - Invalid input parameters",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "detail": "Invalid request: Text cannot be empty"
+                            }
+                        }
+                    }
+                },
+                401: {
+                    "description": "Unauthorized - Invalid or missing authentication token"
+                },
+                500: {
+                    "description": "Internal Server Error - LLM service or processing error",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "detail": "Failed to compose email: LLM service unavailable"
+                            }
+                        }
+                    }
+                }
+            },
+            tags=["LLM", "Email Composition"])
+async def compose_email(
+    request: ComposeEmailRequest,
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        container = get_container()
+        use_case = container.compose_email_use_case()
+        
+        result = await use_case.execute(
+            user_id=current_user.id,
+            text=request.text,
+            recipients=request.recipients,
+            purpose=request.purpose,
+            tone=request.tone,
+            additional_context=request.additional_context
+        )
+        
+        return ComposeEmailResponse(
+            content=result.get("content", ""),
+            subject=result.get("subject"),
+            tone_used=result.get("tone_used", "professional"),
+            user_profile_used=result.get("user_profile_used", False),
+            email_type_detected=result.get("email_type_detected", "started"),
+            success=True
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compose email: {str(e)}")
 
 
 @router.post("/chat/start", response_model=GeminiChatResponse)
@@ -338,7 +491,21 @@ async def execute_with_tools(
         raise HTTPException(status_code=500, detail=f"Failed to execute with tools: {str(e)}")
 
 
-@router.get("/health", response_model=GeminiHealthResponse)
+@router.get("/health", 
+           response_model=GeminiHealthResponse,
+           summary="LLM Service Health Check",
+           description="""
+           Check the health and status of the LLM (Gemini) service.
+           
+           This endpoint verifies:
+           - Connection to the LLM service
+           - Available models
+           - Basic functionality with a test response
+           
+           Useful for monitoring and debugging LLM-related issues.
+           """,
+           response_description="LLM service health status and configuration",
+           tags=["LLM", "Health"])
 async def llm_health_check():
     """
     Health check for Gemini service.

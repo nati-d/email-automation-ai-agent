@@ -28,7 +28,9 @@ class UserAccount(BaseEntity):
     updated_at: datetime = field(default_factory=datetime.utcnow)
     
     def __post_init__(self):
-        """Validate user account"""
+        """Initialize UserAccount entity and validate"""
+        super().__init__()
+        
         if not self.user_id:
             raise ValueError("User ID cannot be empty")
         
