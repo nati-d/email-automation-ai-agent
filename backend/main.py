@@ -23,6 +23,7 @@ from app.presentation.api.health_controller import router as health_router
 from app.presentation.api.oauth_controller import router as oauth_router
 from app.presentation.api.category_controller import router as category_router
 from app.presentation.api.user_account_controller import router as user_account_router
+from app.presentation.api.llm_controller import router as llm_router
 
 
 @asynccontextmanager
@@ -88,6 +89,10 @@ tags_metadata = [
         "name": "user-accounts",
         "description": "User account management for tracking associated email accounts.",
     },
+    {
+        "name": "LLM",
+        "description": "LLM-powered features including email composition, sentiment analysis, and AI chat capabilities.",
+    },
 ]
 
 # Create FastAPI instance with clean architecture configuration
@@ -127,6 +132,7 @@ app.include_router(email_router, prefix=settings.api_prefix, tags=["emails"])
 app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(category_router, prefix=settings.api_prefix, tags=["categories"])
 app.include_router(user_account_router, prefix=settings.api_prefix, tags=["user-accounts"])
+app.include_router(llm_router, prefix=settings.api_prefix, tags=["LLM"])
 
 
 @app.get("/", 
