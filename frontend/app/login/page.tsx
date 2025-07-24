@@ -2,7 +2,7 @@ import Login from "../../components/login";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="min-h-screen w-full flex items-center justify-center bg-">
       <Login />
     </div>
   );

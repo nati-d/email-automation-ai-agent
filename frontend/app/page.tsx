@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../lib/utils";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 interface Email extends BaseEmail {
   label?: string;
@@ -86,7 +87,8 @@ export default function Home() {
   )
 
   return (
-    <div className="flex flex-col min-h-0 w-full min-w-0 h-full overflow-x-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
+    <ProtectedRoute>
+      <div className="flex flex-col min-h-0 w-full min-w-0 h-full overflow-x-hidden" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         {/* Category Header */}
         {currentCategory && (
           <div className="flex items-center gap-2 px-6 py-3 bg-card border-b" style={{ borderColor: 'var(--border)' }}>
@@ -214,6 +216,7 @@ export default function Home() {
             })}
           </ul>
         </main>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

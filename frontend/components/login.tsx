@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { LogIn, Info, Sparkles } from "lucide-react";
 import { FcGoogle } from "react-icons/fc";
 import { getGoogleAuthUrl } from '../lib/api/auth'; // updated path
@@ -9,6 +10,32 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const userStr = localStorage.getItem("user");
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          const sessionId = user.sessionId || user.session_id;
+          
+          if (sessionId) {
+            router.replace("/");
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Auth check error:", error);
+        localStorage.removeItem("user");
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   async function handleGoogleLogin() {
     setError(null);
@@ -28,40 +55,80 @@ export default function Login() {
     }
   }
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: 'var(--background)' }}>
+        <div className="text-lg" style={{ color: 'var(--foreground)' }}>Checking authentication...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-900">
-      <div className="w-full max-w-md bg-white dark:bg-zinc-950 rounded-2xl shadow-xl px-8 py-10 flex flex-col items-center gap-8 border border-zinc-200 dark:border-zinc-800">
+    <div className="w-full max-w-md rounded-2xl shadow-xl px-8 py-10 flex flex-col items-center gap-8 border"
+      style={{ 
+        background: 'var(--card)',
+        borderColor: 'var(--border)'
+      }}
+    >
         {/* Minimalistic icon at the top */}
-        <span className="flex items-center justify-center w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 mb-2">
-          <Sparkles className="w-7 h-7 text-zinc-700 dark:text-zinc-300" />
+        <span 
+          className="flex items-center justify-center w-12 h-12 rounded-full mb-2"
+          style={{ background: 'var(--muted)' }}
+        >
+          <Sparkles className="w-7 h-7" style={{ color: 'var(--muted-foreground)' }} />
         </span>
         {/* Bold heading with accent */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-center text-zinc-800 dark:text-zinc-100 leading-tight">
-          Joyful and productive <br /> email automation. <span className="font-extrabold text-indigo-600 dark:text-sky-400">All in one.</span>
+        <h1 className="text-2xl sm:text-3xl font-bold text-center leading-tight" style={{ color: 'var(--foreground)' }}>
+          Joyful and productive <br /> email automation. <span className="font-extrabold" style={{ color: 'var(--primary)' }}>All in one.</span>
         </h1>
         {/* Info box */}
-        <div className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-3 flex items-start gap-3 shadow-sm">
-          <Info className="w-5 h-5 mt-0.5 text-indigo-600 dark:text-sky-400" />
+        <div 
+          className="w-full border rounded-lg px-4 py-3 flex items-start gap-3 shadow-sm"
+          style={{ 
+            background: 'var(--muted)',
+            borderColor: 'var(--border)'
+          }}
+        >
+          <Info className="w-5 h-5 mt-0.5" style={{ color: 'var(--primary)' }} />
           <div>
-            <div className="font-semibold text-zinc-800 dark:text-zinc-100 text-sm">We need access to your Google account</div>
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">Please allow all permissions to enable full AI features.</div>
+            <div className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>We need access to your Google account</div>
+            <div className="text-xs" style={{ color: 'var(--muted-foreground)' }}>Please allow all permissions to enable full AI features.</div>
           </div>
         </div>
         {/* Error message */}
         {error && (
-          <div className="w-full bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-red-700 dark:text-red-200 text-sm text-center">
+          <div 
+            className="w-full border rounded-lg px-4 py-3 text-sm text-center"
+            style={{ 
+              background: 'var(--destructive)',
+              borderColor: 'var(--destructive)',
+              color: 'var(--destructive-foreground)'
+            }}
+          >
             {error}
           </div>
         )}
         {/* Success message */}
         {success && (
-          <div className="w-full bg-green-50 dark:bg-green-900 border border-green-200 dark:border-green-800 rounded-lg px-4 py-3 text-green-700 dark:text-green-200 text-sm text-center">
+          <div 
+            className="w-full border rounded-lg px-4 py-3 text-sm text-center"
+            style={{ 
+              background: 'var(--success)',
+              borderColor: 'var(--success)',
+              color: 'var(--success-foreground)'
+            }}
+          >
             {success}
           </div>
         )}
         {/* Google button */}
         <button
-          className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-semibold text-base shadow hover:bg-zinc-800 dark:hover:bg-white transition-colors border border-zinc-900/10 dark:border-zinc-100/10 disabled:opacity-60 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-3 px-6 py-3 rounded-lg font-semibold text-base shadow transition-colors border disabled:opacity-60 disabled:cursor-not-allowed"
+          style={{
+            background: 'var(--primary)',
+            color: 'var(--primary-foreground)',
+            borderColor: 'var(--primary)'
+          }}
           onClick={handleGoogleLogin}
           disabled={loading}
         >
@@ -69,10 +136,9 @@ export default function Login() {
           {loading ? 'Redirecting...' : 'Continue with Google'}
         </button>
         {/* Terms note */}
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 text-center mt-2">
+        <p className="text-xs text-center mt-2" style={{ color: 'var(--muted-foreground)' }}>
           By clicking "Continue with Google", you acknowledge that you have read and agree to our Terms & Conditions and Privacy Policy.
         </p>
       </div>
-    </div>
   );
 } 
