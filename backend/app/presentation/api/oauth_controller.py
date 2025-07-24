@@ -277,7 +277,7 @@ async def google_oauth_callback(
             redirect_params.append(f"sent_emails_imported=0")
             redirect_params.append(f"sent_email_import_success=true")
         
-        redirect_url = f"{settings.frontend_url}/oauth_test.html?{'&'.join(redirect_params)}"
+        redirect_url = f"{settings.frontend_url}/auth-success?{'&'.join(redirect_params)}"
         print(f"✅ OAuth authentication successful! Redirecting to: {redirect_url}")
         return RedirectResponse(url=redirect_url)
         
@@ -297,53 +297,22 @@ async def google_oauth_callback(
         return RedirectResponse(url=redirect_url)
 
 
-@router.post("/auth/refresh",
-            response_model=OAuthTokenRefreshResponse,
-            summary="Refresh OAuth Token",
-            description="Refresh an expired OAuth access token using the refresh token.",
-            dependencies=[Depends(security)])
-async def refresh_oauth_token(
-    user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
-    use_case: RefreshOAuthTokenUseCase = Depends(get_refresh_oauth_token_use_case)
-) -> OAuthTokenRefreshResponse:
-    """
-    ## Refresh OAuth Token
-    
-    Refresh an expired OAuth access token using the stored refresh token.
-    
-    ### Usage
-    
-    Use this endpoint when your access token expires to get a new one without
-    requiring the user to re-authenticate.
-    
-    ### Authentication
-    
-    - **Authorization**: Bearer token (session ID) required in Authorization header
-    - **Example**: `Authorization: Bearer your_session_id_here`
-    
-    ### Response
-    
-    Returns a new access token with updated expiration time.
-    """
-    try:
-        current_user, session_id = user_and_session
-        
-        result = await use_case.execute(session_id)
-        
-        return OAuthTokenRefreshResponse(
-            access_token=result["access_token"],
-            expires_in=result["expires_in"],
-            message="Token refreshed successfully",
-            session_id=session_id
-        )
-        
-    except DomainException as e:
-        raise _handle_domain_exception(e)
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": "INTERNAL_ERROR", "message": str(e)}
-        )
+# Disabled refresh token endpoint
+# @router.post("/auth/refresh",
+#             response_model=OAuthTokenRefreshResponse,
+#             summary="Refresh OAuth Token",
+#             description="Refresh an expired OAuth access token using the refresh token.",
+#             dependencies=[Depends(security)])
+# async def refresh_oauth_token(
+#     user_and_session: tuple[UserDTO, str] = Depends(get_current_user_with_session_id),
+#     use_case: RefreshOAuthTokenUseCase = Depends(get_refresh_oauth_token_use_case)
+# ) -> OAuthTokenRefreshResponse:
+#     """Refresh an expired OAuth access token using the refresh token."""
+#     user, session_id = user_and_session
+#     try:
+#         return use_case.execute(user, session_id)
+#     except DomainException as e:
+#         raise _handle_domain_exception(e)
 
 
 @router.get("/auth/me",

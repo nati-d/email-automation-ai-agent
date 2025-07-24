@@ -452,31 +452,52 @@ async def delete_email(
         )
 
 
-@router.post("/send", response_model=SendEmailResponse)
+@router.post(
+    "/send",
+    response_model=SendEmailResponse,
+    summary="Send an Email",
+    description="""
+    Send a new email to one or more recipients.
+    
+    **Required fields:**
+    - `recipients`: List of recipient email addresses
+    - `subject`: Email subject
+    - `body`: Email body text (plain text)
+    
+    No other fields are accepted. This endpoint is designed for simple, direct email sending.
+    
+    **Example:**
+    ```json
+    {
+      "recipients": ["user@example.com"],
+      "subject": "Hello!",
+      "body": "This is a test email."
+    }
+    ```
+    """,
+    response_description="Result of the send email operation",
+    tags=["emails", "send"]
+)
 async def send_email(
     request: SendEmailRequest,
     current_user: UserDTO = Depends(get_current_user)
 ) -> SendEmailResponse:
-    """Send a new email"""
+    """
+    Send a new email to one or more recipients. Only recipients, subject, and body are accepted.
+    """
     container = get_container()
     use_case = container.send_new_email_use_case()
-    
     result = await use_case.execute(
         subject=request.subject,
-        content=request.content,
+        body=request.body,
         recipients=request.recipients,
-        cc=request.cc,
-        bcc=request.bcc,
-        sender_email=current_user.email,  # Use current user's email as sender
-        content_type=request.content_type,
-        priority=request.priority
+        sender_email=current_user.email
     )
-    
     return SendEmailResponse(
-        success=result["success"],
-        message=result["message"],
-        email_id=result.get("email_id"),
-        sent_at=result.get("sent_at")
+        success=True,
+        message="Email sent successfully",
+        email_id=getattr(result, "id", None),
+        sent_at=getattr(result, "sent_at", None)
     )
 
 

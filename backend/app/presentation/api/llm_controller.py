@@ -24,8 +24,8 @@ from ...presentation.models.llm_models import (
     SmartEmailComposerResponse,
     GenerateEmailResponseRequest,
     GenerateEmailResponseResponse,
-    ComposeEmailRequest,
-    ComposeEmailResponse,
+    ComposeEmailQueryRequest,
+    ComposeEmailBodyResponse,
     GeminiChatRequest,
     GeminiChatResponse,
     GeminiVisionRequest,
@@ -198,121 +198,49 @@ async def generate_email_response(
         raise HTTPException(status_code=500, detail=f"Failed to generate email response: {str(e)}")
 
 
-@router.post("/compose-email", 
-            response_model=ComposeEmailResponse,
-            summary="Compose Email with User Profile",
-            description="""
-            Compose an email using the user's profile and preferences.
-            
-            This endpoint automatically detects whether the input text is:
-            - **A reply to an existing email** (detects reply indicators like "Re:", "Thank you for your email", etc.)
-            - **A partial email text** that you started writing (completes the email naturally)
-            
-            The endpoint uses the user's profile to match their typical writing style, tone, and favorite phrases.
-            
-            ## Features
-            
-            - **Automatic Email Type Detection**: Determines if input is a reply or started email
-            - **User Profile Integration**: Uses your writing style, tone, and favorite phrases
-            - **Smart Tone Selection**: Can auto-detect tone or use specified tone
-            - **Context-Aware Generation**: Considers recipients and purpose
-            
-            ## Authentication
-            
-            - **Authorization**: Bearer token (session ID) required in Authorization header
-            - **Example**: `Authorization: Bearer your_session_id_here`
-            
-            ## Usage Examples
-            
-            ### Reply to an Email
-            ```json
-            {
-                "text": "Hi John, I received your email about the project proposal. I think we should discuss this further.",
-                "recipients": ["john@company.com"],
-                "purpose": "Reply to project proposal discussion",
-                "tone": "professional",
-                "additional_context": "John is the project manager"
-            }
-            ```
-            
-            ### Complete a Started Email
-            ```json
-            {
-                "text": "Dear Sarah,",
-                "recipients": ["sarah@company.com"],
-                "purpose": "Request for meeting",
-                "tone": "friendly",
-                "additional_context": "Need to schedule a 30-minute meeting next week"
-            }
-            ```
-            """,
-            response_description="Generated email content with metadata",
-            responses={
-                200: {
-                    "description": "Email composed successfully",
-                    "content": {
-                        "application/json": {
-                            "example": {
-                                "content": "Hi John,\n\nThank you for your email about the project proposal. I've reviewed the details and I think we should definitely discuss this further.\n\nI'm particularly interested in the timeline you've outlined and would like to explore how we can align it with our current priorities.\n\nWould you be available for a call this week to discuss the next steps?\n\nBest regards,\n[Your Name]",
-                                "subject": "Re: Project Proposal Discussion",
-                                "tone_used": "professional",
-                                "user_profile_used": True,
-                                "email_type_detected": "reply",
-                                "success": True
-                            }
-                        }
-                    }
-                },
-                400: {
-                    "description": "Bad Request - Invalid input parameters",
-                    "content": {
-                        "application/json": {
-                            "example": {
-                                "detail": "Invalid request: Text cannot be empty"
-                            }
-                        }
-                    }
-                },
-                401: {
-                    "description": "Unauthorized - Invalid or missing authentication token"
-                },
-                500: {
-                    "description": "Internal Server Error - LLM service or processing error",
-                    "content": {
-                        "application/json": {
-                            "example": {
-                                "detail": "Failed to compose email: LLM service unavailable"
-                            }
-                        }
-                    }
-                }
-            },
-            tags=["LLM", "Email Composition"])
+@router.post(
+    "/compose-email",
+    response_model=ComposeEmailBodyResponse,
+    summary="Compose Email Body (Query Only)",
+    description="""
+    Generate an email body from a query. The query can be an email to reply to, or any text to start a new email. The system will automatically detect the context and use the user's profile to generate the body in their style.
+    
+    - **Input:**
+        - `query`: The email to reply to, or any text to start a new email.
+    - **Output:**
+        - `body`: The generated email body as plain text.
+    
+    ## Example
+    ```json
+    {
+      "query": "Hi John, I received your email about the project proposal. I think we should discuss this further."
+    }
+    ```
+    """,
+    response_description="Generated email body as plain text.",
+    tags=["LLM", "Email Composition"]
+)
 async def compose_email(
-    request: ComposeEmailRequest,
+    request: ComposeEmailQueryRequest,
     current_user: User = Depends(get_current_user)
 ):
+    """
+    Generate an email body from a query using the user's profile.
+    """
     try:
         container = get_container()
         use_case = container.compose_email_use_case()
-        
+        # Only pass query and user_id
         result = await use_case.execute(
             user_id=current_user.id,
-            text=request.text,
-            recipients=request.recipients,
-            purpose=request.purpose,
-            tone=request.tone,
-            additional_context=request.additional_context
+            query=request.query
         )
-        
-        return ComposeEmailResponse(
-            content=result.get("content", ""),
-            subject=result.get("subject"),
-            tone_used=result.get("tone_used", "professional"),
-            user_profile_used=result.get("user_profile_used", False),
-            email_type_detected=result.get("email_type_detected", "started"),
-            success=True
-        )
+        # Assume result is a dict with 'body' key or just a string
+        if isinstance(result, dict):
+            body = result.get("body") or result.get("content") or ""
+        else:
+            body = str(result)
+        return ComposeEmailBodyResponse(body=body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
     except Exception as e:

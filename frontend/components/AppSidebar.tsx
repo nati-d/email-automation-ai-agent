@@ -39,6 +39,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchCategories, createCategory, Category } from "@/lib/api/categories"
 import { useApp } from "./AppContext"
 import { AddCategoryModal } from "./email/AddCategoryModal"
+import { useComposeModal } from "@/components/email/ComposeEmail";
 
 // Define User type locally for now
 interface User {
@@ -67,6 +68,7 @@ export function AppSidebar() {
   const [modalOpen, setModalOpen] = React.useState(false)
   const [modalLoading, setModalLoading] = React.useState(false)
   const [addAccountLoading, setAddAccountLoading] = React.useState(false)
+  const { openCompose } = useComposeModal();
 
   React.useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -167,6 +169,7 @@ export function AppSidebar() {
           <Button
             className="w-full font-semibold rounded-full px-6 py-3 shadow transition text-base"
             style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
+            onClick={openCompose}
           >
             <Plus className="w-5 h-5 mr-2" /> COMPOSE
           </Button>

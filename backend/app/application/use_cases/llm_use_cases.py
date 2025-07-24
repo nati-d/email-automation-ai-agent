@@ -142,31 +142,18 @@ class ComposeEmailUseCase:
         # Default to started email if no clear reply indicators
         return "started"
     
-    async def execute(self, 
-                     user_id: str,
-                     text: str,
-                     recipients: List[str],
-                     purpose: Optional[str] = None,
-                     tone: str = "auto",
-                     additional_context: str = "") -> Dict[str, Any]:
+    async def execute(self, user_id: str, query: str) -> dict:
         """
-        Compose an email using the user's profile and preferences.
-        
+        Compose an email body using the user's profile and the provided query.
         Args:
             user_id (str): ID of the user composing the email
-            text (str): Email text - either original email to reply to or partial email text
-            recipients (List[str]): List of recipient email addresses
-            purpose (Optional[str]): Optional purpose or context of the email
-            tone (str): Desired tone (auto, professional, casual, formal, friendly, etc.)
-            additional_context (str): Additional context or requirements
-            
+            query (str): The query for composing the email (email to reply to, or any text)
         Returns:
-            Dict: Dictionary containing content, subject, tone_used, and user_profile_used
+            dict: { 'body': <generated email body as plain text> }
         """
         # Get user profile if available
         user_profile = None
         user_profile_used = False
-        
         if self.user_repository:
             try:
                 user = await self.user_repository.find_by_id(user_id)
@@ -178,90 +165,32 @@ class ComposeEmailUseCase:
                     print(f"ℹ️ No user profile available for user {user_id}")
             except Exception as e:
                 print(f"⚠️ Error fetching user profile: {e}")
-        
-        # Determine the tone to use
-        tone_used = tone
-        if tone == "auto" and user_profile and user_profile.get("dominant_tone"):
-            tone_used = user_profile["dominant_tone"]
-            print(f"🎯 Using auto-detected tone: {tone_used}")
-        
-        # Automatically detect email type
-        email_type = self._detect_email_type(text)
+        # Detect email type
+        email_type = self._detect_email_type(query)
         print(f"🔍 Detected email type: {email_type}")
-        
-        # Build the system instruction
-        system_instruction = f"You are an expert email composer. Compose a {tone_used} email."
-        
-        # Add user profile context if available
+        # Build system instruction
+        system_instruction = "You are an expert email composer. Compose an email body only. Do not include subject or signature."
         if user_profile:
             profile_context = f"""
 User's email style profile:
 - Dominant tone: {user_profile.get('dominant_tone', 'professional')}
 - Common structures: {', '.join(user_profile.get('common_structures', []))}
 - Favorite phrases: {', '.join(user_profile.get('favorite_phrases', []))}
-- Style summary: {user_profile.get('summary', 'Professional and clear communication style')}
-
-Please incorporate the user's typical writing style, tone, and favorite phrases into the email composition.
+- Summary: {user_profile.get('summary', '')}
 """
-            system_instruction += profile_context
-        
-        # Build the query based on detected email type
+            system_instruction += "\n" + profile_context
+        # Compose prompt
         if email_type == "reply":
-            query = f"""
-Compose a {tone_used} reply to the following email:
-
-Original Email:
-{text}
-
-Recipients: {', '.join(recipients)}
-{f"Purpose: {purpose}" if purpose else ""}
-{f"Additional context: {additional_context}" if additional_context else ""}
-
-Please write a complete reply that matches the user's typical style and tone.
-"""
-        else:  # started email
-            query = f"""
-Complete the following email that the user started writing:
-
-Partial Email Text:
-{text}
-
-Recipients: {', '.join(recipients)}
-{f"Purpose: {purpose}" if purpose else ""}
-{f"Additional context: {additional_context}" if additional_context else ""}
-
-Please complete the email in a natural way that matches the user's typical style and tone.
-"""
-        
-        # Generate the email content
-        content = self.llm_service.generate_content(
+            prompt = f"Reply to the following email in the user's style.\n\nEmail:\n{query}"
+        else:
+            prompt = f"Complete the following started email in the user's style.\n\nStarted email:\n{query}"
+        # Call LLM service
+        body = self.llm_service.generate_content(
             system_instruction=system_instruction,
-            query=query,
+            query=prompt,
             response_type="text/plain"
         )
-        
-        result = {
-            "content": content,
-            "tone_used": tone_used,
-            "user_profile_used": user_profile_used,
-            "email_type_detected": email_type
-        }
-        
-        # Generate subject line for started emails if the original text doesn't have one
-        if email_type == "started" and not any(line.strip().lower().startswith("subject:") for line in text.split('\n')):
-            try:
-                # Extract a potential subject from the first line or generate one
-                first_line = text.strip().split('\n')[0]
-                if len(first_line) < 100:  # If first line is short, it might be a subject
-                    subject = first_line
-                else:
-                    subject = self.llm_service.suggest_email_subject(content, purpose or "Email composition")
-                result["subject"] = subject
-            except Exception as e:
-                print(f"⚠️ Failed to generate subject line: {e}")
-                result["subject"] = None
-        
-        return result
+        return {"body": body}
 
 
 class SmartEmailComposerUseCase:
