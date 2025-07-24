@@ -2,7 +2,7 @@ import React, { useState, useContext, createContext, ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { sendEmail } from "@/lib/api/email";
+import { sendEmail, getEmailSuggestions } from "@/lib/api/email";
 
 interface ComposeEmailProps {
   open: boolean;
@@ -51,6 +51,9 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [showSuggestion, setShowSuggestion] = useState(false);
 
   React.useEffect(() => {
     if (!open) {
@@ -96,6 +99,32 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   const handleMinimize = () => setMinimized(true);
   const handleMaximize = () => setMaximized((m) => !m);
   const handleRestore = () => setMinimized(false);
+
+  const handleGetSuggestions = async () => {
+    if (!body.trim()) {
+      setError("Please enter some text to get suggestions");
+      return;
+    }
+    setSuggestionsLoading(true);
+    setError(null);
+    try {
+      const response = await getEmailSuggestions({ query: body });
+      setSuggestion(response.body || null);
+      setShowSuggestion(true);
+    } catch (err: any) {
+      setError(err.message || err.data?.detail || "Failed to get suggestions");
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const handleApplySuggestion = () => {
+    if (suggestion) {
+      setBody(suggestion);
+      setShowSuggestion(false);
+      setSuggestion(null);
+    }
+  };
 
   // Modal styles
   const baseStyle =
@@ -231,7 +260,41 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
           />
           {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
           {success && <div className="text-green-600 text-sm mt-1">{success}</div>}
+          {showSuggestion && suggestion && (
+            <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
+              <div className="text-sm font-medium mb-2">AI Suggestion:</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap">
+                {suggestion}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleApplySuggestion}
+                >
+                  Apply Suggestion
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSuggestion(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 justify-end mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleGetSuggestions}
+              disabled={loading || suggestionsLoading}
+            >
+              {suggestionsLoading ? "Getting Suggestions..." : "Get Suggestions"}
+            </Button>
             <Button
               type="button"
               variant="secondary"
