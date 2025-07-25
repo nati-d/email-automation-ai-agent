@@ -30,26 +30,7 @@ async def get_current_user(
     session_id_query: Optional[str] = Query(None, alias="session_id"),  # Keep for backward compatibility
     use_case: GetOAuthUserInfoUseCase = Depends(get_oauth_user_info_use_case)
 ) -> UserDTO:
-    """
-    Middleware to get the currently authenticated user.
-    
-    This middleware extracts the session ID from either:
-    - X-Session-ID header
-    - session_id query parameter
-    
-    If no valid session is found, it raises an HTTP 401 Unauthorized error.
-    
-    Args:
-        session_id: Session ID from X-Session-ID header
-        session_id_query: Session ID from query parameter
-        use_case: OAuth user info use case
-        
-    Returns:
-        UserDTO: The authenticated user's data
-        
-    Raises:
-        HTTPException: 401 if no valid session found, 500 for other errors
-    """
+    print(f"[DEBUG] Incoming Authorization header: {authorization}")
     # Extract session ID from Authorization header (Bearer token) or query parameter
     actual_session_id = None
     

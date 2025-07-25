@@ -61,8 +61,7 @@ const SIDEBAR_ITEMS = [
 
 export function AppSidebar() {
   const { toggleSidebar } = useSidebar()
-  const { currentCategory, setCurrentCategory } = useApp()
-  const [user, setUser] = React.useState<User | null>(null)
+  const { currentCategory, setCurrentCategory, user } = useApp()
   const [categories, setCategories] = React.useState<Category[]>([])
   const [loading, setLoading] = React.useState(true)
   const [modalOpen, setModalOpen] = React.useState(false)
@@ -71,13 +70,7 @@ export function AppSidebar() {
   const { openCompose } = useComposeModal();
 
   React.useEffect(() => {
-    const stored = localStorage.getItem("user")
-    if (stored) {
-      setUser(JSON.parse(stored))
-    }
-  }, [])
-
-  React.useEffect(() => {
+    if (!user) return; // Only fetch if user is present
     const loadCategories = async () => {
       try {
         setLoading(true)
@@ -92,7 +85,7 @@ export function AppSidebar() {
     }
 
     loadCategories()
-  }, [])
+  }, [user]) // Depend on user
 
   const handleCategoryClick = (categoryName: string) => {
     setCurrentCategory(categoryName)

@@ -284,29 +284,33 @@ async def list_categories(
     current_user: UserDTO = Depends(get_current_user),
     use_case: ListCategoriesUseCase = Depends(get_list_categories_use_case)
 ) -> CategoryListResponse:
-    """List categories for a user"""
-    print(f"🔧 DEBUG: [CategoryController] list_categories called")
-    print(f"🔧 DEBUG: [CategoryController] current_user: {current_user}")
-    print(f"🔧 DEBUG: [CategoryController] include_inactive: {include_inactive}")
-    
+    print("[DEBUG] list_categories endpoint called")
+    print(f"[DEBUG] include_inactive: {include_inactive}")
+    print(f"[DEBUG] current_user: {current_user}")
+    if hasattr(current_user, 'id'):
+        print(f"[DEBUG] current_user.id: {current_user.id}")
+    else:
+        print("[DEBUG] current_user has no 'id' attribute")
+    if hasattr(current_user, 'email'):
+        print(f"[DEBUG] current_user.email: {current_user.email}")
+    else:
+        print("[DEBUG] current_user has no 'email' attribute")
+    print(f"[DEBUG] use_case: {use_case}")
     try:
-        print(f"🔧 DEBUG: [CategoryController] Calling use_case.execute")
+        print("[DEBUG] Calling use_case.execute...")
         result_dto = await use_case.execute(current_user.id, include_inactive)
-        print(f"🔧 DEBUG: [CategoryController] Use case returned: {result_dto}")
-        
+        print(f"[DEBUG] use_case.execute returned: {result_dto}")
         response = _list_dto_to_response(result_dto)
-        print(f"🔧 DEBUG: [CategoryController] Converted to response: {response}")
-        
+        print(f"[DEBUG] Converted result to response: {response}")
         return response
-        
     except DomainException as e:
-        print(f"🔧 DEBUG: [CategoryController] DomainException: {e}")
+        print(f"[DEBUG] DomainException: {e}")
         raise _handle_domain_exception(e)
     except Exception as e:
-        print(f"🔧 DEBUG: [CategoryController] Exception: {e}")
-        print(f"🔧 DEBUG: [CategoryController] Exception type: {type(e).__name__}")
+        print(f"[DEBUG] Exception: {e}")
+        print(f"[DEBUG] Exception type: {type(e).__name__}")
         import traceback
-        print(f"🔧 DEBUG: [CategoryController] Full traceback: {traceback.format_exc()}")
+        print(f"[DEBUG] Full traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": "INTERNAL_ERROR", "message": str(e)}
