@@ -12,6 +12,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from contextlib import asynccontextmanager
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 # Infrastructure
 from app.infrastructure.config.settings import get_settings
@@ -117,6 +118,24 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
+# Add middleware to trust proxy headers (for correct scheme/host handling)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+
+# Custom middleware to handle proxy headers
+@app.middleware("http")
+async def proxy_headers_middleware(request, call_next):
+    """Handle proxy headers for Cloud Run"""
+    # Trust X-Forwarded-* headers from Cloud Run
+    if "x-forwarded-proto" in request.headers:
+        request.scope["scheme"] = request.headers["x-forwarded-proto"]
+    if "x-forwarded-host" in request.headers:
+        request.scope["headers"] = [(b"host", request.headers["x-forwarded-host"].encode())] + [
+            (k.encode(), v.encode()) for k, v in request.headers.items() if k.lower() not in ["x-forwarded-proto", "x-forwarded-host"]
+        ]
+    
+    response = await call_next(request)
+    return response
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
@@ -188,9 +207,18 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+    import os
+    
+    # Use PORT from environment (Cloud Run requirement)
+    port = int(os.getenv("PORT", settings.api_port))
+    
+    print(f"🚀 Starting Email Agent API on port {port}")
+    print(f"🔧 Environment: PORT={os.getenv('PORT', '8000')}")
+    print(f"🔧 Settings: api_host={settings.api_host}, api_port={settings.api_port}")
+    
     uvicorn.run(
         app, 
-        host=settings.api_host, 
-        port=settings.api_port,
+        host="0.0.0.0",  # Required for Cloud Run
+        port=port,
         log_level=settings.log_level.lower()
     ) 

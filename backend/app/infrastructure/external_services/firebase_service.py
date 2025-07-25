@@ -32,10 +32,21 @@ class FirebaseService:
                 cred_path = self.settings.firebase_credentials_path
                 
                 # Check if credentials file exists
-                if not os.path.exists(cred_path):
-                    raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
-                
-                cred = credentials.Certificate(cred_path)
+                if os.path.exists(cred_path):
+                    cred = credentials.Certificate(cred_path)
+                    print(f"✅ Using Firebase credentials from file: {cred_path}")
+                else:
+                    # Try to use environment variables for credentials
+                    import json
+                    firebase_creds = os.getenv('FIREBASE_CREDENTIALS_JSON')
+                    if firebase_creds:
+                        cred_dict = json.loads(firebase_creds)
+                        cred = credentials.Certificate(cred_dict)
+                        print("✅ Using Firebase credentials from environment variable")
+                    else:
+                        print(f"⚠️ Warning: Firebase credentials file not found at {cred_path}")
+                        print("⚠️ Firebase features will be disabled")
+                        return
                 
                 # Initialize with project ID if provided
                 app_config = {}
@@ -52,7 +63,8 @@ class FirebaseService:
             
         except Exception as e:
             print(f"❌ Error initializing Firebase: {e}")
-            raise e
+            print("⚠️ Firebase features will be disabled")
+            # Don't raise the exception to allow the app to start
     
     def get_firestore_client(self) -> firestore.Client:
         """Get Firestore database client"""

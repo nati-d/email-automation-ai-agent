@@ -685,9 +685,15 @@ class Container:
     
     def initialize(self) -> None:
         """Initialize all services"""
-        # Initialize Firebase
-        firebase = self.firebase_service()
-        firebase.initialize()
+        try:
+            # Initialize Firebase
+            firebase = self.firebase_service()
+            firebase.initialize()
+            print("✅ Container initialization completed successfully")
+        except Exception as e:
+            print(f"⚠️ Warning: Firebase initialization failed: {e}")
+            print("⚠️ Application will continue without Firebase (some features may not work)")
+            # Don't raise the exception to allow the app to start
     
     def cleanup(self) -> None:
         """Cleanup all services"""
