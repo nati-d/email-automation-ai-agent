@@ -8,6 +8,7 @@ import { EmailMetadata } from "@/components/email/EmailMetadata";
 import { EmailAIInsights } from "@/components/email/EmailAIInsights";
 import { EmailBody } from "@/components/email/EmailBody";
 import { Button } from "@/components/ui/button";
+import { useComposeModal } from "@/components/email/ComposeEmail";
 
 export default function EmailDetailPage() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function EmailDetailPage() {
   const [email, setEmail] = useState<Email | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { replyToEmail } = useComposeModal();
 
   useEffect(() => {
     setLoading(true);
@@ -80,7 +82,15 @@ export default function EmailDetailPage() {
               senderInitial={email.sender ? email.sender.charAt(0).toUpperCase() : "?"}
               recipients={email.recipients || []}
               date={formatEmailDate(email.sent_at || email.created_at || email.updated_at)}
-              onReply={() => {}}
+              onReply={() => {
+                replyToEmail({
+                  id: email.id,
+                  sender: email.sender || "Unknown sender",
+                  subject: email.subject || "(No subject)",
+                  body: email.body,
+                  recipients: email.recipients
+                });
+              }}
               onReplyAll={() => {}}
               onForward={() => {}}
             />

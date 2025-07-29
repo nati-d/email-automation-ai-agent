@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { fetchEmails, fetchEmailsByCategory, fetchInboxEmails, fetchTaskEmails, type Email as BaseEmail } from "../lib/api/email";
-import { Star, StarOff, Mail, UserIcon, Tag, Plus } from "lucide-react"
+import { Star, StarOff, Mail, UserIcon, Tag, Plus, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../lib/utils";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { useComposeModal } from "@/components/email/ComposeEmail";
 
 interface Email extends BaseEmail {
   label?: string;
@@ -46,6 +47,7 @@ export default function Home() {
   const [starred, setStarred] = useState<{ [id: string]: boolean }>({})
   const [activeTab, setActiveTab] = useState("Primary")
   const router = useRouter();
+  const { replyToEmail } = useComposeModal();
 
   useEffect(() => {
     if (user) {
@@ -77,6 +79,16 @@ export default function Home() {
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function handleReply(email: Email) {
+    replyToEmail({
+      id: email.id,
+      sender: email.sender,
+      subject: email.subject || "(No subject)",
+      body: email.body,
+      recipients: email.recipients
+    });
   }
 
   const filteredEmails = emails.filter(
@@ -150,7 +162,7 @@ export default function Home() {
               return (
                 <li
                   key={email.id}
-                  className={`flex flex-col px-6 py-3 hover:bg-[var(--muted)] transition-colors cursor-pointer text-sm ${email.read ? '' : 'font-bold'}`}
+                  className={`group flex flex-col px-6 py-3 hover:bg-[var(--muted)] transition-colors cursor-pointer text-sm ${email.read ? '' : 'font-bold'}`}
                   style={{ background: email.read ? 'var(--card)' : 'var(--accent-foreground)', color: 'var(--foreground)' }}
                   onClick={() => router.push(`/email/${email.id}`)}
                 >
@@ -172,6 +184,18 @@ export default function Home() {
                       {formatEmailDate(email.sent_at || email.created_at || email.updated_at)}
                       {!email.read && <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--accent)' }} />}
                     </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleReply(email);
+                      }}
+                      title="Reply"
+                    >
+                      <Reply className="w-4 h-4" />
+                    </Button>
                   </div>
                   {/* AI Insights Bar */}
                   <div className="flex flex-wrap items-center gap-2 mt-1 pl-12">

@@ -9,6 +9,14 @@ interface ComposeEmailProps {
   onClose: () => void;
 }
 
+interface EmailData {
+  id: string;
+  sender: string;
+  subject: string;
+  body?: string;
+  recipients?: string[];
+}
+
 const initialState = {
   to: "",
   subject: "",
@@ -22,15 +30,32 @@ interface ComposeModalContextType {
   open: boolean;
   openCompose: () => void;
   closeCompose: () => void;
+  replyToEmail: (email: EmailData) => void;
+  replyData: EmailData | null;
 }
 const ComposeModalContext = createContext<ComposeModalContextType | undefined>(undefined);
 
 export function ComposeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const openCompose = () => setOpen(true);
-  const closeCompose = () => setOpen(false);
+  const [replyData, setReplyData] = useState<EmailData | null>(null);
+  
+  const openCompose = () => {
+    setReplyData(null);
+    setOpen(true);
+  };
+  
+  const closeCompose = () => {
+    setOpen(false);
+    setReplyData(null);
+  };
+  
+  const replyToEmail = (email: EmailData) => {
+    setReplyData(email);
+    setOpen(true);
+  };
+  
   return (
-    <ComposeModalContext.Provider value={{ open, openCompose, closeCompose }}>
+    <ComposeModalContext.Provider value={{ open, openCompose, closeCompose, replyToEmail, replyData }}>
       {children}
     </ComposeModalContext.Provider>
   );
@@ -43,6 +68,7 @@ export function useComposeModal() {
 }
 
 const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
+  const { replyData } = useComposeModal();
   const [to, setTo] = useState(initialState.to);
   const [subject, setSubject] = useState(initialState.subject);
   const [body, setBody] = useState(initialState.body);
@@ -67,6 +93,20 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
       setLoading(false);
     }
   }, [open]);
+
+  // Handle reply data when modal opens
+  React.useEffect(() => {
+    if (open && replyData) {
+      // Pre-fill the form for reply
+      setTo(replyData.sender);
+      setSubject(replyData.subject.startsWith('Re:') ? replyData.subject : `Re: ${replyData.subject}`);
+      
+      // Add reply prefix to body
+      const replyPrefix = `\n\n--- Original Message ---\nFrom: ${replyData.sender}\nSubject: ${replyData.subject}\n\n`;
+      const originalBody = replyData.body || '';
+      setBody(replyPrefix + originalBody);
+    }
+  }, [open, replyData]);
 
   if (!open) return null;
 
