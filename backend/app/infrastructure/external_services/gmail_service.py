@@ -11,6 +11,7 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 import email
 from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from ...domain.entities.email import Email, EmailStatus
 from ...domain.value_objects.email_address import EmailAddress
@@ -78,7 +79,7 @@ class GmailService:
                     ).execute()
                     
                     # Parse email
-                    email_obj = self._parse_gmail_message(msg, user_email_address)
+                    email_obj = self._parse_gmail_message(msg, user_email_address, email_type='inbox')
                     if email_obj:
                         emails.append(email_obj)
                         print(f"✅ Parsed email: {email_obj.subject[:50]}...")
@@ -140,10 +141,8 @@ class GmailService:
                     ).execute()
                     
                     # Parse email
-                    email_obj = self._parse_gmail_message(msg, user_email_address)
+                    email_obj = self._parse_gmail_message(msg, user_email_address, email_type='inbox', is_starred=True)
                     if email_obj:
-                        # Mark as starred in metadata
-                        email_obj.metadata['is_starred'] = True
                         emails.append(email_obj)
                         print(f"✅ Parsed starred email: {email_obj.subject[:50]}...")
                     
@@ -204,7 +203,7 @@ class GmailService:
                     ).execute()
                     
                     # Parse email
-                    email_obj = self._parse_gmail_message(msg, user_email_address)
+                    email_obj = self._parse_gmail_message(msg, user_email_address, email_type='sent')
                     if email_obj:
                         emails.append(email_obj)
                         print(f"✅ Parsed sent email: {email_obj.subject[:50]}...")
@@ -222,7 +221,7 @@ class GmailService:
             print(f"❌ Gmail fetch traceback: {traceback.format_exc()}")
             raise Exception(f"Failed to fetch sent emails from Gmail: {str(e)}")
     
-    def _parse_gmail_message(self, gmail_msg: Dict[str, Any], user_email: EmailAddress) -> Optional[Email]:
+    def _parse_gmail_message(self, gmail_msg: Dict[str, Any], user_email: EmailAddress, email_type: str = 'inbox', is_starred: bool = False) -> Optional[Email]:
         """Parse Gmail message into our Email entity"""
         try:
             payload = gmail_msg.get('payload', {})
@@ -250,7 +249,15 @@ class GmailService:
             # Parse date
             email_date = self._parse_date(date_str) if date_str else datetime.utcnow()
             
-            # Create email entity
+            # Create email entity with proper email_type and starred flag
+            metadata = {
+                'gmail_id': gmail_msg.get('id'),
+                'gmail_thread_id': gmail_msg.get('threadId'),
+                'imported_at': datetime.utcnow().isoformat(),
+                'import_source': 'gmail_oauth',
+                'is_starred': is_starred
+            }
+            
             email = Email(
                 sender=sender,
                 recipients=recipients,
@@ -262,12 +269,8 @@ class GmailService:
                 # Account ownership fields
                 account_owner=str(user_email),  # The logged-in user's email
                 email_holder=str(user_email),   # The email account that holds these emails
-                metadata={
-                    'gmail_id': gmail_msg.get('id'),
-                    'gmail_thread_id': gmail_msg.get('threadId'),
-                    'imported_at': datetime.utcnow().isoformat(),
-                    'import_source': 'gmail_oauth'
-                }
+                email_type=email_type,  # Set the email type (inbox, sent, etc.)
+                metadata=metadata
             )
             
             # Set created_at to email date for proper sorting
@@ -372,4 +375,96 @@ class GmailService:
             from email.utils import parsedate_to_datetime
             return parsedate_to_datetime(date_str)
         except Exception:
-            return datetime.utcnow() 
+            return datetime.utcnow()
+    
+    async def send_email_via_gmail(
+        self, 
+        oauth_token: OAuthToken, 
+        sender_email: str,
+        recipients: List[str], 
+        subject: str, 
+        body: str, 
+        html_body: Optional[str] = None
+    ) -> bool:
+        """Send email through Gmail API on behalf of the user"""
+        try:
+            print(f"🔄 GmailService.send_email_via_gmail called:")
+            print(f"   - sender_email: {sender_email}")
+            print(f"   - recipients: {recipients}")
+            print(f"   - subject: {subject}")
+            print(f"   - body length: {len(body)} chars")
+            print(f"   - html_body: {'provided' if html_body else 'None'}")
+            print(f"   - oauth_token.access_token: {oauth_token.access_token[:20] if oauth_token.access_token else 'None'}...")
+            
+            # Create Gmail service
+            print("🔄 Creating Google credentials...")
+            credentials = self._create_credentials(oauth_token)
+            print(f"🔧 Credentials created - token: {credentials.token[:20] if credentials.token else 'None'}...")
+            
+            print("🔄 Building Gmail service...")
+            service = build(self.service_name, self.version, credentials=credentials)
+            print("✅ Gmail service built successfully")
+            
+            # Create email message
+            print("🔄 Creating email message...")
+            message = self._create_email_message(sender_email, recipients, subject, body, html_body)
+            print("✅ Email message created")
+            
+            # Send email through Gmail API
+            print("🔄 Sending email through Gmail API...")
+            result = service.users().messages().send(
+                userId='me',
+                body={'raw': message}
+            ).execute()
+            
+            print(f"✅ Email sent successfully through Gmail API!")
+            print(f"   📧 Message ID: {result.get('id')}")
+            print(f"   📧 Thread ID: {result.get('threadId')}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to send email through Gmail API: {str(e)}")
+            import traceback
+            print(f"❌ Gmail send traceback: {traceback.format_exc()}")
+            return False
+    
+    def _create_email_message(
+        self, 
+        sender_email: str, 
+        recipients: List[str], 
+        subject: str, 
+        body: str, 
+        html_body: Optional[str] = None
+    ) -> str:
+        """Create email message in Gmail API format"""
+        try:
+            # Create message
+            if html_body:
+                # Create multipart message with both text and HTML
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = subject
+                msg['From'] = sender_email
+                msg['To'] = ', '.join(recipients)
+                
+                # Add text part
+                text_part = MIMEText(body, 'plain', 'utf-8')
+                msg.attach(text_part)
+                
+                # Add HTML part
+                html_part = MIMEText(html_body, 'html', 'utf-8')
+                msg.attach(html_part)
+            else:
+                # Create simple text message
+                msg = MIMEText(body, 'plain', 'utf-8')
+                msg['Subject'] = subject
+                msg['From'] = sender_email
+                msg['To'] = ', '.join(recipients)
+            
+            # Encode message
+            raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')
+            return raw_message
+            
+        except Exception as e:
+            print(f"❌ Failed to create email message: {str(e)}")
+            raise Exception(f"Failed to create email message: {str(e)}") 

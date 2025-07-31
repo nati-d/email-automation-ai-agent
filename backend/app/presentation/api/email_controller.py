@@ -314,15 +314,26 @@ async def get_sent_emails(
     limit: int = Query(50, ge=1, le=100, description="Number of sent emails to return"),
     offset: int = Query(0, ge=0, description="Number of sent emails to skip")
 ) -> EmailListResponse:
-    """Get sent emails for the current user (database only)"""
+    """Get sent emails for the current user from the 'sent_email' collection"""
     container = get_container()
-    list_emails_use_case = container.list_emails_use_case()
-    emails_result = await list_emails_use_case.execute(
+    email_repository = container.email_repository()
+    
+    # Fetch sent emails directly from the 'sent_email' collection
+    sent_emails = await email_repository.find_sent_emails(
         account_owner=current_user.email,
         limit=limit
     )
-    sent_emails = [email for email in emails_result.emails if getattr(email, 'email_type', None) == 'sent']
-    emails = [EmailResponse(**{**email.__dict__}) for email in sent_emails]
+    
+    emails = [
+        EmailResponse(
+            **{
+                **email.__dict__,
+                "sender": str(email.sender),
+                "recipients": [str(recipient) for recipient in email.recipients]
+            }
+        )
+        for email in sent_emails
+        ]
     return EmailListResponse(
         emails=emails,
         total_count=len(sent_emails),
@@ -331,7 +342,6 @@ async def get_sent_emails(
         has_next=False,
         has_prev=False
     )
-
 
 @router.get("/{email_id}", response_model=EmailResponse)
 async def get_email(

@@ -121,13 +121,17 @@ class FirestoreEmailRepository(EmailRepository):
     
     async def find_by_sender(self, sender: EmailAddress, limit: int = 50) -> List[Email]:
         """Find emails by sender"""
+        # Simple query without ordering to avoid index requirement
         query = self.db.collection(self.collection_name)\
             .where("sender", "==", str(sender))\
-            .order_by("created_at", direction=firestore.Query.DESCENDING)\
             .limit(limit)
         
         docs = query.stream()
-        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        emails = [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        
+        # Sort in Python by created_at (descending)
+        emails.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+        return emails
     
     async def find_by_recipient(self, recipient: EmailAddress, limit: int = 50) -> List[Email]:
         """Find emails by recipient"""
@@ -142,13 +146,17 @@ class FirestoreEmailRepository(EmailRepository):
     
     async def find_by_account_owner(self, account_owner: str, limit: int = 50) -> List[Email]:
         """Find emails by account owner (logged-in user)"""
+        # Simple query without ordering to avoid index requirement
         query = self.db.collection(self.collection_name)\
             .where("account_owner", "==", account_owner)\
-            .order_by("created_at", direction=firestore.Query.DESCENDING)\
             .limit(limit)
         
         docs = query.stream()
-        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        emails = [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        
+        # Sort in Python by created_at (descending)
+        emails.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+        return emails
     
 
     
@@ -224,4 +232,18 @@ class FirestoreEmailRepository(EmailRepository):
             .limit(limit)
         
         docs = query.stream()
-        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs] 
+        return [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+    
+    async def find_sent_emails(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find sent emails from the 'sent_email' collection"""
+        # Simple query without ordering to avoid index requirement
+        query = self.db.collection("sent_email")\
+            .where("account_owner", "==", account_owner)\
+            .limit(limit)
+        
+        docs = query.stream()
+        emails = [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        
+        # Sort in Python by created_at (descending)
+        emails.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+        return emails 

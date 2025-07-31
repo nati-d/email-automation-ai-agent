@@ -179,9 +179,11 @@ class SendEmailUseCase(EmailUseCaseBase):
 class SendNewEmailUseCase(EmailUseCaseBase):
     """Use case for creating and sending a new email"""
     
-    def __init__(self, email_repository: EmailRepository, email_service=None):
+    def __init__(self, email_repository: EmailRepository, email_service=None, gmail_service=None, oauth_repository=None):
         super().__init__(email_repository)
         self.email_service = email_service
+        self.gmail_service = gmail_service
+        self.oauth_repository = oauth_repository
     
     async def execute(self, sender_email: str, recipients: List[str], subject: str, body: str, html_body: Optional[str] = None) -> EmailDTO:
         """Create and send a new email"""
@@ -217,40 +219,93 @@ class SendNewEmailUseCase(EmailUseCaseBase):
             print(f"      body length: {len(body)} chars")
             print(f"      html_body: {'provided' if html_body else 'None'}")
             
-            # Send email using email service if available
-            if self.email_service:
-                print(f"🔍 DEBUG: Email service is available, calling send_email()")
-                print(f"   🔧 Email service type: {type(self.email_service).__name__}")
+            # Try Gmail API first (preferred for sending on behalf of user)
+            if self.gmail_service and self.oauth_repository:
+                print(f"🔍 DEBUG: Gmail service is available, attempting to send via Gmail API")
+                print(f"   🔧 Gmail service type: {type(self.gmail_service).__name__}")
                 
                 try:
-                    success = await self.email_service.send_email(
-                        sender=sender_email,
-                        recipients=recipients,
-                        subject=subject,
-                        body=body,
-                        html_body=html_body
-                    )
-                    print(f"🔍 DEBUG: Email service send_email() returned: {success}")
+                    # Get user's OAuth token
+                    print(f"🔍 DEBUG: Getting OAuth token for user: {sender_email}")
                     
-                    if not success:
-                        print(f"🔍 DEBUG: Email service returned False, marking as failed")
-                        # Email service failed to send
-                        saved_email.mark_as_failed("Email service failed to send email")
-                        await self.email_repository.update(saved_email)
-                        raise DomainValidationError("Failed to send email: Email service returned failure")
-                    else:
-                        print(f"🔍 DEBUG: Email service returned True, proceeding to mark as sent")
+                    # First find the user by email
+                    from ...domain.repositories.user_repository import UserRepository
+                    from ...infrastructure.di.container import get_container
+                    container = get_container()
+                    user_repo = container.user_repository()
+                    
+                    user = await user_repo.find_by_email(EmailAddress.create(sender_email))
+                    if not user:
+                        print(f"⚠️ User not found for email: {sender_email}")
+                        raise Exception("User not found")
+                    
+                    # Get user's active OAuth session
+                    oauth_session = await self.oauth_repository.find_active_session_by_user_id(user.id)
+                    
+                    if oauth_session:
+                        oauth_token = oauth_session.token
+                        print(f"🔍 DEBUG: Found OAuth token, sending via Gmail API")
                         
-                except Exception as email_service_error:
-                    print(f"🔍 DEBUG: Email service threw exception: {email_service_error}")
-                    print(f"🔍 DEBUG: Exception type: {type(email_service_error).__name__}")
-                    import traceback
-                    print(f"🔍 DEBUG: Email service exception traceback: {traceback.format_exc()}")
-                    raise email_service_error
+                        success = await self.gmail_service.send_email_via_gmail(
+                            oauth_token=oauth_token,
+                            sender_email=sender_email,
+                            recipients=recipients,
+                            subject=subject,
+                            body=body,
+                            html_body=html_body
+                        )
+                        
+                        if success:
+                            print(f"✅ Email sent successfully via Gmail API")
+                        else:
+                            print(f"⚠️ Gmail API send failed, falling back to SMTP")
+                            raise Exception("Gmail API send failed")
+                    else:
+                        print(f"⚠️ No OAuth token found for user, falling back to SMTP")
+                        raise Exception("No OAuth token found")
+                        
+                except Exception as gmail_error:
+                    print(f"⚠️ Gmail API send failed: {gmail_error}, falling back to SMTP")
+                    # Fall back to SMTP service
+                    if self.email_service:
+                        print(f"🔍 DEBUG: Falling back to SMTP email service")
+                        success = await self.email_service.send_email(
+                            sender=sender_email,
+                            recipients=recipients,
+                            subject=subject,
+                            body=body,
+                            html_body=html_body
+                        )
+                        
+                        if not success:
+                            saved_email.mark_as_failed("Both Gmail API and SMTP failed")
+                            await self.email_repository.update(saved_email)
+                            raise DomainValidationError("Failed to send email: Both Gmail API and SMTP failed")
+                    else:
+                        saved_email.mark_as_failed("Gmail API failed and no SMTP service available")
+                        await self.email_repository.update(saved_email)
+                        raise DomainValidationError("Failed to send email: Gmail API failed and no SMTP service available")
+            
+            # Use SMTP service if Gmail API is not available
+            elif self.email_service:
+                print(f"🔍 DEBUG: Using SMTP email service")
+                print(f"   🔧 Email service type: {type(self.email_service).__name__}")
+                
+                success = await self.email_service.send_email(
+                    sender=sender_email,
+                    recipients=recipients,
+                    subject=subject,
+                    body=body,
+                    html_body=html_body
+                )
+                
+                if not success:
+                    saved_email.mark_as_failed("SMTP service failed to send email")
+                    await self.email_repository.update(saved_email)
+                    raise DomainValidationError("Failed to send email: SMTP service failed")
                     
             else:
                 print(f"🔍 DEBUG: No email service available")
-                # No email service available
                 saved_email.mark_as_failed("No email service configured")
                 await self.email_repository.update(saved_email)
                 raise DomainValidationError("Failed to send email: No email service configured")

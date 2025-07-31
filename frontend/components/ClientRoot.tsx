@@ -14,21 +14,14 @@ function ComposeModalRoot() {
 
 export default function ClientRoot({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLoginPage = pathname === "/login";
+  const isDashboardRoute = pathname?.startsWith("/dashboard") || pathname?.startsWith("/email");
 
   return (
     <AppProvider>
       <SidebarProvider>
         <ComposeModalProvider>
-          {isLoginPage ? (
-            // Login page layout - no sidebar, no navbar
-            <div className="min-h-screen w-full flex items-center justify-center bg-primary">
-              {children}
-              {/* Compose Email Modal (global) */}
-              <ComposeModalRoot />
-            </div>
-          ) : (
-            // Main app layout with sidebar and navbar
+          {isDashboardRoute ? (
+            // Dashboard layout with sidebar and navbar
             <div className="flex h-screen w-full">
               <AppSidebar />
               <main className="flex-1 min-w-0 h-full overflow-y-auto bg-[var(--background)] flex flex-col">
@@ -37,6 +30,13 @@ export default function ClientRoot({ children }: { children: React.ReactNode }) 
                 {/* Compose Email Modal (global) */}
                 <ComposeModalRoot />
               </main>
+            </div>
+          ) : (
+            // Landing page layout - no sidebar, no navbar
+            <div className="min-h-screen w-full">
+              {children}
+              {/* Compose Email Modal (global) */}
+              <ComposeModalRoot />
             </div>
           )}
         </ComposeModalProvider>

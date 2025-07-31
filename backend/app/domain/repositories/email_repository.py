@@ -68,4 +68,9 @@ class EmailRepository(ABC):
     @abstractmethod
     async def find_recent_emails(self, limit: int = 10) -> List[Email]:
         """Find recent emails"""
+        pass
+    
+    @abstractmethod
+    async def find_sent_emails(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find sent emails from the 'sent_email' collection"""
         pass 

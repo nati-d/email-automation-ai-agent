@@ -19,6 +19,8 @@ interface AppContextType {
   setSearch: (search: string) => void;
   currentCategory: string | null;
   setCurrentCategory: (category: string | null) => void;
+  currentEmailType: string;
+  setCurrentEmailType: (emailType: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -27,6 +29,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [search, setSearch] = useState("")
   const [currentCategory, setCurrentCategory] = useState<string | null>(null)
+  const [currentEmailType, setCurrentEmailType] = useState<string>("inbox") // Default to inbox
 
   useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -36,7 +39,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AppContext.Provider value={{ user, setUser, search, setSearch, currentCategory, setCurrentCategory }}>
+    <AppContext.Provider value={{ 
+      user, 
+      setUser, 
+      search, 
+      setSearch, 
+      currentCategory, 
+      setCurrentCategory,
+      currentEmailType,
+      setCurrentEmailType
+    }}>
       {children}
     </AppContext.Provider>
   )

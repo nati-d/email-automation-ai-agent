@@ -61,7 +61,7 @@ const SIDEBAR_ITEMS = [
 
 export function AppSidebar() {
   const { toggleSidebar } = useSidebar()
-  const { currentCategory, setCurrentCategory, user } = useApp()
+  const { currentCategory, setCurrentCategory, currentEmailType, setCurrentEmailType, user } = useApp()
   const [categories, setCategories] = React.useState<Category[]>([])
   const [loading, setLoading] = React.useState(true)
   const [modalOpen, setModalOpen] = React.useState(false)
@@ -93,6 +93,12 @@ export function AppSidebar() {
 
   const handleInboxClick = () => {
     setCurrentCategory(null) // Clear category filter to show all emails
+    setCurrentEmailType("inbox") // Set email type to inbox
+  }
+
+  const handleEmailTypeClick = (emailType: string) => {
+    setCurrentCategory(null) // Clear category filter
+    setCurrentEmailType(emailType.toLowerCase()) // Set the email type (sent, starred, etc.)
   }
 
   const handleAddCategory = async (categoryData: { name: string }) => {
@@ -111,7 +117,7 @@ export function AppSidebar() {
 
   function handleLogout() {
     localStorage.removeItem("user")
-    window.location.reload()
+    window.location.href = "/"
   }
 
   // Add Account integration
@@ -174,11 +180,11 @@ export function AppSidebar() {
                 <SidebarMenuItem key={label}>
                   <SidebarMenuButton
                     asChild
-                    isActive={active && !currentCategory}
-                    className={active && !currentCategory ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
-                    style={active && !currentCategory ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
+                    isActive={(label.toLowerCase() === currentEmailType) && !currentCategory}
+                    className={(label.toLowerCase() === currentEmailType) && !currentCategory ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
+                    style={(label.toLowerCase() === currentEmailType) && !currentCategory ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
                   >
-                    <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate" onClick={label === "Inbox" ? handleInboxClick : undefined}>
+                    <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate" onClick={label === "Inbox" ? handleInboxClick : () => handleEmailTypeClick(label)}>
                       <span className="flex items-center gap-2 truncate">
                         <Icon className="w-5 h-5 shrink-0" />
                         <span className="truncate">{label}</span>

@@ -61,6 +61,24 @@ export async function fetchTaskEmails(): Promise<Email[]> {
   return response.data.emails;
 }
 
+export async function fetchSentEmails(): Promise<Email[]> {
+  const response = await apiRequest<{ emails: Email[] }>({
+    url: '/emails/sent',
+    method: 'GET',
+  });
+  console.log(response.data);
+  return response.data.emails;
+}
+
+export async function fetchStarredEmails(): Promise<Email[]> {
+  const response = await apiRequest<{ emails: Email[] }>({
+    url: '/emails/starred',
+    method: 'GET',
+  });
+  console.log(response.data);
+  return response.data.emails;
+}
+
 export interface SendEmailPayload {
   body: string;
   recipients: string[];

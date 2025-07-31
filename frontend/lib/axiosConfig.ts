@@ -1,8 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { refreshToken } from './api/auth';
 
-const API_BASE = 'https://backend-service-813842978116.us-central1.run.app/api';
-// const API_BASE = 'http://127.0.0.1:8000/api';
+// const API_BASE = 'https://backend-service-813842978116.us-central1.run.app/api';
+const API_BASE = 'http://127.0.0.1:8000/api';
 
 // Create an Axios instance
 const apiClient: AxiosInstance = axios.create({

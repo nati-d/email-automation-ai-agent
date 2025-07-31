@@ -282,13 +282,20 @@ class Container:
             print(f"🔍 DEBUG: Creating SendNewEmailUseCase")
             email_repo = self.email_repository()
             email_svc = self.email_service()
+            gmail_svc = self.gmail_service()
+            oauth_repo = self.oauth_repository()
+            
             print(f"   📧 Email repository type: {type(email_repo).__name__}")
             print(f"   📧 Email service type: {type(email_svc).__name__}")
+            print(f"   📧 Gmail service type: {type(gmail_svc).__name__}")
+            print(f"   📧 OAuth repository type: {type(oauth_repo).__name__}")
             print(f"   📧 Email service configured: {email_svc.is_configured()}")
             
             self._send_new_email_use_case = SendNewEmailUseCase(
                 email_repository=email_repo,
-                email_service=email_svc
+                email_service=email_svc,
+                gmail_service=gmail_svc,
+                oauth_repository=oauth_repo
             )
             print(f"   ✅ SendNewEmailUseCase created successfully")
         return self._send_new_email_use_case

@@ -226,6 +226,34 @@ class ProcessOAuthCallbackUseCase(OAuthUseCaseBase):
                 # Fetch emails for new users only
                 if is_new_user:
                     try:
+                        # Fetch inbox emails for new users
+                        if self.fetch_emails_use_case:
+                            try:
+                                print("🔄 Fetching inbox emails for new user...")
+                                print(f"🔧 DEBUG: fetch_emails_use_case type: {type(self.fetch_emails_use_case).__name__}")
+                                
+                                inbox_email_result = await self.fetch_emails_use_case.execute(
+                                    oauth_token=token,
+                                    user_email=user.email.value,
+                                    limit=50
+                                )
+                                result["email_import"] = inbox_email_result
+                                print(f"✅ Inbox email import result: {inbox_email_result}")
+                                print(f"📊 Inbox emails imported: {inbox_email_result.get('emails_imported', 0)}")
+                                print(f"📊 Inbox emails summarized: {inbox_email_result.get('emails_summarized', 0)}")
+                            except Exception as e:
+                                print(f"⚠️ Failed to fetch inbox emails, but continuing: {str(e)}")
+                                print(f"⚠️ Inbox email fetch error type: {type(e).__name__}")
+                                import traceback
+                                print(f"⚠️ Inbox email fetch traceback: {traceback.format_exc()}")
+                                result["email_import"] = {
+                                    "success": False,
+                                    "error": str(e),
+                                    "message": "Failed to import inbox emails but registration succeeded"
+                                }
+                        else:
+                            print("⚠️ Skipping inbox email fetch - fetch_emails_use_case is None")
+                        
                         # Fetch sent emails for new users
                         if self.fetch_sent_emails_use_case:
                             try:

@@ -4,6 +4,7 @@ OAuth Controller
 Clean architecture implementation of OAuth API endpoints.
 """
 
+import json
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPBearer
