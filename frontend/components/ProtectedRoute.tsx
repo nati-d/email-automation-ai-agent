@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         const user = JSON.parse(userStr);
         const sessionId = user.sessionId || user.session_id;
-        
+
         if (!sessionId) {
           localStorage.removeItem("user");
           router.replace("/login");
@@ -34,7 +34,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       } catch (error) {
         console.error("Auth check error:", error);
         localStorage.removeItem("user");
-        router.replace("/login");
+        router.replace("/");
       } finally {
         setIsLoading(false);
       }
