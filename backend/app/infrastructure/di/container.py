@@ -50,6 +50,7 @@ from ...application.use_cases.llm_use_cases import (
     SmartEmailComposerUseCase, GeminiChatUseCase,
     GeminiVisionUseCase, GeminiToolsUseCase, GeminiHealthCheckUseCase
 )
+from ...application.use_cases.email_chatbot_use_case import EmailChatbotUseCase
 from ...application.use_cases.category_use_cases import (
     CreateCategoryUseCase, GetCategoryUseCase, UpdateCategoryUseCase,
     DeleteCategoryUseCase, ListCategoriesUseCase, RecategorizeEmailsUseCase
@@ -121,6 +122,7 @@ class Container:
         self._gemini_vision_use_case: Optional[GeminiVisionUseCase] = None
         self._gemini_tools_use_case: Optional[GeminiToolsUseCase] = None
         self._gemini_health_check_use_case: Optional[GeminiHealthCheckUseCase] = None
+        self._email_chatbot_use_case: Optional[EmailChatbotUseCase] = None
         
         # Category use cases
         self._create_category_use_case: Optional[CreateCategoryUseCase] = None
@@ -584,6 +586,16 @@ class Container:
         if self._gemini_health_check_use_case is None:
             self._gemini_health_check_use_case = GeminiHealthCheckUseCase(self.llm_service())
         return self._gemini_health_check_use_case
+    
+    def email_chatbot_use_case(self) -> EmailChatbotUseCase:
+        """Get email chatbot use case"""
+        if self._email_chatbot_use_case is None:
+            self._email_chatbot_use_case = EmailChatbotUseCase(
+                self.llm_service(),
+                self.email_repository(),
+                self.user_repository()
+            )
+        return self._email_chatbot_use_case
     
     # Category Use Cases
     def create_category_use_case(self) -> CreateCategoryUseCase:

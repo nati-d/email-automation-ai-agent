@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useComposeModal } from "@/components/email/ComposeEmail";
+import ChatBot from "@/components/ChatBot";
 
 interface Email extends BaseEmail {
   label?: string;
@@ -34,9 +35,9 @@ interface Email extends BaseEmail {
 }
 
 const TABS = [
-  { label: "All", icon: Mail },
-  { label: "Inbox", icon: Mail },
-  { label: "Tasks", icon: Tag },
+  { label: "All", value: "all", icon: Mail },
+  { label: "Inbox", value: "inbox", icon: Mail },
+  { label: "Tasks", value: "tasks", icon: Tag },
 ]
 
 export default function Dashboard() {
@@ -45,7 +46,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [starred, setStarred] = useState<{ [id: string]: boolean }>({})
-  const [activeTab, setActiveTab] = useState("Primary")
+  const [activeTab, setActiveTab] = useState("all")
   const router = useRouter();
   const { replyToEmail } = useComposeModal();
 
@@ -60,17 +61,11 @@ export default function Dashboard() {
           if (currentCategory) {
             data = await fetchEmailsByCategory(currentCategory);
           } 
-          // Otherwise, fetch emails based on the current email type
+          // Otherwise, fetch emails based on the active tab
           else {
-            switch (currentEmailType) {
+            switch (activeTab) {
               case "inbox":
                 data = await fetchInboxEmails();
-                break;
-              case "sent":
-                data = await fetchSentEmails();
-                break;
-              case "starred":
-                data = await fetchStarredEmails();
                 break;
               case "tasks":
                 data = await fetchTaskEmails();
@@ -91,7 +86,7 @@ export default function Dashboard() {
       }
       fetchData()
     }
-  }, [user, currentCategory, currentEmailType])
+  }, [user, currentCategory, activeTab])
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -132,18 +127,18 @@ export default function Dashboard() {
 
         {/* Tabs */}
         <div className="flex items-center gap-4 px-6 pt-4 pb-2 border-b" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          {TABS.map(({ label, icon: Icon }) => (
+          {TABS.map(({ label, value, icon: Icon }) => (
             <button
-              key={label}
+              key={value}
               className={`flex items-center gap-2 px-4 py-2 rounded-t-lg text-sm font-semibold transition-colors relative
-            ${activeTab === label ? '' : ''}`}
-              style={activeTab === label
+            ${activeTab === value ? '' : ''}`}
+              style={activeTab === value
                 ? { color: 'var(--accent)', background: 'var(--accent-foreground)' }
                 : { color: 'var(--muted-foreground)' }}
-              onClick={() => setActiveTab(label)}
+              onClick={() => setActiveTab(value)}
             >
               <Icon className="w-4 h-4" /> {label}
-              {activeTab === label && <span className="absolute bottom-0 left-0 w-full h-0.5 rounded-t-sm" style={{ background: 'var(--accent)' }} />}
+              {activeTab === value && <span className="absolute bottom-0 left-0 w-full h-0.5 rounded-t-sm" style={{ background: 'var(--accent)' }} />}
             </button>
           ))}
           <Button variant="ghost" size="icon" className="ml-auto rounded-full" style={{ color: 'var(--muted-foreground)' }}>
@@ -257,6 +252,9 @@ export default function Dashboard() {
           </ul>
         </main>
       </div>
+      
+      {/* Floating ChatBot */}
+      <ChatBot />
     </ProtectedRoute>
   )
 }

@@ -105,4 +105,23 @@ export async function getEmailSuggestions(payload: EmailSuggestionsPayload) {
     data: payload,
   });
   return response.data;
+}
+
+export interface ChatBotMessage {
+  message: string;
+}
+
+export interface ChatBotResponse {
+  message: string;
+}
+
+export async function sendChatBotMessage(payload: ChatBotMessage): Promise<string> {
+  const response = await apiRequest<ChatBotResponse>({
+    url: '/llm/email-chatbot/chat',
+    method: 'POST',
+    data: payload,
+  });
+
+  console.log(response.data);
+  return response.data.message;
 } 

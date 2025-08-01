@@ -44,12 +44,13 @@ class Settings(BaseSettings):
     # Authentication
     secret_key: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30000"))
     
     # Google OAuth
     google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
     google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+    # google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "https://backend-service-813842978116.us-central1.run.app/api/auth/google/callback")
     google_scopes: List[str] = [
         "openid",
         "https://www.googleapis.com/auth/userinfo.email",
@@ -57,8 +58,8 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.readonly",
         "https://www.googleapis.com/auth/gmail.send"
     ]
-    # frontend_url: str = os.getenv("FRONTEND_URL", "https://frontend-service-813842978116.us-central1.run.app")
-    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    frontend_url: str = os.getenv("FRONTEND_URL", "https://frontend-service-813842978116.us-central1.run.app")
+    # frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
     # CORS
     allowed_origins: List[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,https://frontend-service-813842978116.us-central1.run.app").split(",")

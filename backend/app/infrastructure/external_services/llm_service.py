@@ -120,8 +120,14 @@ class LLMService:
             Chat session object
         """
         try:
+            print(f"🔧 DEBUG: [LLMService] start_chat called")
+            print(f"🔧 DEBUG: [LLMService] tools provided: {tools is not None}")
+            if tools:
+                print(f"🔧 DEBUG: [LLMService] number of tools: {len(tools)}")
+            
             model = genai.GenerativeModel(
-                model_name=model_name or self.model_name
+                model_name=model_name or self.model_name,
+                tools=tools or []  # Pass tools to the model
             )
             
             chat = model.start_chat(history=history or [])
@@ -130,10 +136,13 @@ class LLMService:
             if session_id:
                 self._chat_sessions[session_id] = chat
                 
+            print(f"🔧 DEBUG: [LLMService] Chat session created successfully")
             return chat
             
         except Exception as e:
-            print(f"[LLMService] start_chat failed: {e}")
+            print(f"❌ ERROR: [LLMService] start_chat failed: {e}")
+            import traceback
+            print(f"❌ TRACEBACK: {traceback.format_exc()}")
             raise
 
     def send_message(

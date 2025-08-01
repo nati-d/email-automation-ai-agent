@@ -17,7 +17,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       try {
         const userStr = localStorage.getItem("user");
         if (!userStr) {
-          router.replace("/login");
+          router.replace("/");
           return;
         }
 
@@ -26,7 +26,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         
         if (!sessionId) {
           localStorage.removeItem("user");
-          router.replace("/login");
+          router.replace("/");
           return;
         }
 
@@ -34,7 +34,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
       } catch (error) {
         console.error("Auth check error:", error);
         localStorage.removeItem("user");
-        router.replace("/login");
+        router.replace("/");
       } finally {
         setIsLoading(false);
       }
@@ -52,7 +52,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAuthenticated) {
-    return null; // Will redirect to login
+    return null; // Will redirect to 
   }
 
   return <>{children}</>;

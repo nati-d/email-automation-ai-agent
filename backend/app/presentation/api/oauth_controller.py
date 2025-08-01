@@ -272,6 +272,7 @@ async def google_oauth_callback(
             if sent_email_import.get('error'):
                 redirect_params.append(f"sent_email_import_error={sent_email_import['error'][:100]}")  # Truncate error
             # Add full sent email import data for frontend parsing
+            import json
             redirect_params.append(f"sent_email_import={json.dumps(sent_email_import)}")
         else:
             # Set default values for existing users

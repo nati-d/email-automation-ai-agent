@@ -148,3 +148,16 @@ class GeminiHealthResponse(BaseModel):
     model: str = Field(..., description="Current model name")
     test_response: str = Field(..., description="Test response from Gemini")
     available_models: List[str] = Field(..., description="List of available models") 
+
+# Email Chatbot Models
+class EmailChatbotRequest(BaseModel):
+    message: str = Field(..., description="Message to send to the email chatbot")
+
+class EmailChatbotResponse(BaseModel):
+    message: str = Field(..., description="Response from the email chatbot")
+    success: bool = Field(..., description="Whether the operation was successful")
+    tools_used: Optional[List[str]] = Field(None, description="List of tools used in the response")
+
+class EmailChatbotInfoResponse(BaseModel):
+    message: str = Field(..., description="Welcome message from the email chatbot")
+    capabilities: List[str] = Field(..., description="List of available capabilities") 

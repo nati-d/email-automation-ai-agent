@@ -9,6 +9,7 @@ from typing import Dict, List, Optional, Any
 import base64
 from PIL import Image
 import io
+from datetime import datetime
 
 from ...infrastructure.di.container import get_container
 from ...presentation.middleware.auth_middleware import get_current_user
@@ -32,7 +33,10 @@ from ...presentation.models.llm_models import (
     GeminiVisionResponse,
     GeminiToolsRequest,
     GeminiToolsResponse,
-    GeminiHealthResponse
+    GeminiHealthResponse,
+    EmailChatbotRequest,
+    EmailChatbotResponse,
+    EmailChatbotInfoResponse
 )
 
 router = APIRouter(
@@ -245,6 +249,109 @@ async def compose_email(
         raise HTTPException(status_code=400, detail=f"Invalid request: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to compose email: {str(e)}")
+
+
+# Email Chatbot Endpoints
+@router.get("/email-chatbot/info",
+            response_model=EmailChatbotInfoResponse,
+            summary="Get Email Chatbot Information",
+            description="""
+            Get information about the email chatbot capabilities.
+            
+            This endpoint provides details about what the email chatbot can do,
+            including its features and example queries.
+            
+            ## Features
+            
+            - **Smart Search**: Search by sender, recipient, subject, content, category, and date
+            - **Email Analysis**: Get summaries, sentiment, key topics, and detailed insights
+            - **Statistics**: View email patterns, trends, and breakdowns by category/sender
+            - **Related Emails**: Find emails related to specific topics or conversations
+            - **Recent Activity**: Track recent email activity and important items
+            
+            ## Authentication
+            
+            - **Authorization**: Bearer token (session ID) required in Authorization header
+            - **Example**: `Authorization: Bearer your_session_id_here`
+            """,
+            response_description="Email chatbot capabilities and information",
+            tags=["LLM", "Email Chatbot"])
+async def get_email_chatbot_info(
+    current_user: User = Depends(get_current_user)
+) -> EmailChatbotInfoResponse:
+    """
+    Get information about the email chatbot capabilities.
+    
+    This endpoint provides details about what the email chatbot can do
+    and how to use it effectively.
+    """
+    try:
+        container = get_container()
+        use_case = container.email_chatbot_use_case()
+        
+        result = await use_case.get_email_chatbot_info(current_user.email)
+        
+        return EmailChatbotInfoResponse(
+            message=result["message"],
+            capabilities=result["capabilities"]
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get email chatbot info: {str(e)}")
+
+
+@router.post("/email-chatbot/chat",
+            response_model=EmailChatbotResponse,
+            summary="Chat with Email Bot",
+            description="""
+            Chat with the email intelligence bot to get information about your emails.
+            
+            The chatbot will analyze your request and use appropriate tools to gather
+            information about your emails, then provide a comprehensive response.
+            
+            ## Example Queries
+            
+            - "Show me all emails from john@example.com"
+            - "What are my recent work emails?"
+            - "Find emails about project updates"
+            - "Give me statistics for this month"
+            - "What's my recent email activity?"
+            - "Find emails related to the budget discussion"
+            
+            ## Authentication
+            
+            - **Authorization**: Bearer token (session ID) required in Authorization header
+            - **Example**: `Authorization: Bearer your_session_id_here`
+            """,
+            response_description="Email chatbot response with analysis",
+            tags=["LLM", "Email Chatbot"])
+async def chat_with_email_bot(
+    request: EmailChatbotRequest,
+    current_user: User = Depends(get_current_user)
+) -> EmailChatbotResponse:
+    """
+    Chat with the email bot to get intelligent analysis of your emails.
+    
+    The chatbot will understand your query and use appropriate tools to gather
+    relevant email information, then provide insights and analysis.
+    """
+    try:
+        container = get_container()
+        use_case = container.email_chatbot_use_case()
+        
+        response = await use_case.send_email_chat_message(
+            message=request.message,
+            user_email=current_user.email
+        )
+        
+        return EmailChatbotResponse(
+            message=response,
+            success=True,
+            tools_used=None  # Could be enhanced to track tools used
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to chat with email bot: {str(e)}")
 
 
 @router.post("/chat/start", response_model=GeminiChatResponse)

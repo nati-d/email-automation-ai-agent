@@ -115,12 +115,21 @@ class GoogleOAuthService:
         print(f"✅ Access token received: {credentials.token[:20]}...")
         
         # Calculate expires_in from credentials
-        expires_in = 3600  # Default to 1 hour
+        # Extend session to 30 days (30 * 24 * 60 * 60 = 2,592,000 seconds)
+        SESSION_DURATION_DAYS = 30
+        SESSION_DURATION_SECONDS = SESSION_DURATION_DAYS * 24 * 60 * 60  # 30 days in seconds
+        
+        expires_in = SESSION_DURATION_SECONDS  # Default to 30 days
         if credentials.expiry:
             from datetime import datetime
-            expires_in = int((credentials.expiry - datetime.utcnow()).total_seconds())
-            if expires_in <= 0:
-                expires_in = 3600  # Fallback if already expired
+            google_expires_in = int((credentials.expiry - datetime.utcnow()).total_seconds())
+            if google_expires_in <= 0:
+                expires_in = SESSION_DURATION_SECONDS  # Fallback if already expired
+            else:
+                # Use the longer of Google's expiration or our 30-day session
+                expires_in = max(google_expires_in, SESSION_DURATION_SECONDS)
+        
+        print(f"🔄 Setting session expiration to {SESSION_DURATION_DAYS} days ({expires_in} seconds)")
         
         # Create OAuth token value object
         return OAuthToken.create(
@@ -189,11 +198,21 @@ class GoogleOAuthService:
         
         token_data = response.json()
         
+        # Extend session to 30 days (30 * 24 * 60 * 60 = 2,592,000 seconds)
+        SESSION_DURATION_DAYS = 30
+        SESSION_DURATION_SECONDS = SESSION_DURATION_DAYS * 24 * 60 * 60  # 30 days in seconds
+        
+        # Use the longer of Google's expiration or our 30-day session
+        google_expires_in = token_data.get('expires_in', 3600)
+        expires_in = max(google_expires_in, SESSION_DURATION_SECONDS)
+        
+        print(f"🔄 Refreshing token with {SESSION_DURATION_DAYS}-day session ({expires_in} seconds)")
+        
         # Create new OAuth token
         return OAuthToken.create(
             access_token=token_data['access_token'],
             refresh_token=refresh_token,  # Keep the original refresh token
-            expires_in=token_data.get('expires_in', 3600),
+            expires_in=expires_in,
             scope=token_data.get('scope', " ".join(self.scopes))
         )
     
