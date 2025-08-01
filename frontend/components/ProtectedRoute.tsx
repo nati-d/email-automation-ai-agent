@@ -23,7 +23,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         const user = JSON.parse(userStr);
         const sessionId = user.sessionId || user.session_id;
-        
+
         if (!sessionId) {
           localStorage.removeItem("user");
           router.replace("/");

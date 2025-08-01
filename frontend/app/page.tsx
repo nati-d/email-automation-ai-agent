@@ -245,85 +245,207 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-20 lg:py-32">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden min-h-screen flex items-center">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+          {/* Floating Orbs */}
+          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/20 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute top-40 right-20 w-96 h-96 bg-indigo-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          <div className="absolute bottom-20 left-1/3 w-80 h-80 bg-purple-400/20 rounded-full blur-3xl animate-pulse delay-2000"></div>
+          
+          {/* Grid Pattern */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:14px_24px]"></div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
-            <Badge className="mb-6 bg-blue-100 text-blue-700 hover:bg-blue-100">
-              🚀 Now with GPT-4 powered AI
-            </Badge>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-              Reclaim Your Inbox with an{" "}
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                AI Email Assistant
-              </span>
-            </h1>
-            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              No more inbox clutter. Let AI organize, summarize, and even write your emails.
-              Transform email chaos into organized productivity.
+            {/* Animated Badge */}
+            <div className="inline-flex items-center gap-2 mb-8 px-4 py-2 bg-white/80 backdrop-blur-sm border border-blue-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-medium text-blue-700">🚀 Now with GPT-4 powered AI</span>
+              <div className="w-6 h-6 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center group-hover:rotate-12 transition-transform duration-300">
+                <Zap className="w-3 h-3 text-white" />
+              </div>
+            </div>
+
+            {/* Main Headline with Typing Animation */}
+            <div className="mb-8">
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-gray-900 mb-4 leading-tight">
+                <span className="block mb-2">Reclaim Your</span>
+                <span className="block bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent animate-gradient-x">
+                  Inbox Freedom
+                </span>
+              </h1>
+              <div className="h-1 w-32 bg-gradient-to-r from-blue-500 to-indigo-500 mx-auto rounded-full"></div>
+            </div>
+
+            {/* Subtitle with Fade-in Animation */}
+            <p className="text-xl sm:text-2xl text-gray-600 mb-12 max-w-4xl mx-auto leading-relaxed font-light">
+              Transform email chaos into{" "}
+              <span className="font-semibold text-gray-800">organized productivity</span> with AI that 
+              organizes, summarizes, and writes your emails intelligently.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button
-                size="lg"
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+
+            {/* CTA Buttons with Hover Effects */}
+            <div className="flex flex-col sm:flex-row gap-6 justify-center mb-16">
+              <Button 
+                size="lg" 
+                className="group relative px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
                 onClick={() => setLoginDialogOpen(true)}
               >
-                Try for Free
-                <ArrowRight className="ml-2 w-4 h-4" />
+                <span className="relative z-10 flex items-center">
+                  Start Free Today
+                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-indigo-700 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </Button>
-              <Button size="lg" variant="outline" className="group">
-                <Play className="mr-2 w-4 h-4 group-hover:scale-110 transition-transform" />
-                See How It Works
+              
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="group px-8 py-4 border-2 border-gray-300 hover:border-blue-500 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+              >
+                <Play className="mr-2 w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
+                Watch Demo
               </Button>
             </div>
 
-            {/* Hero Mockup */}
-            <div className="relative max-w-4xl mx-auto">
-              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                    <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                    <div className="ml-4 text-sm text-gray-500">EmailAI Dashboard</div>
+            {/* Enhanced Hero Mockup */}
+            <div className="relative max-w-6xl mx-auto">
+              {/* Floating Elements */}
+              <div className="absolute -top-8 -left-8 w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl rotate-12 opacity-80 animate-bounce delay-300"></div>
+              <div className="absolute -top-4 -right-12 w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full opacity-80 animate-bounce delay-700"></div>
+              <div className="absolute -bottom-6 -left-6 w-20 h-20 bg-gradient-to-r from-green-500 to-teal-500 rounded-3xl rotate-45 opacity-80 animate-bounce delay-1000"></div>
+
+              {/* Main Dashboard Mockup */}
+              <div className="relative bg-white/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 overflow-hidden transform hover:scale-[1.02] transition-transform duration-500">
+                {/* Browser Header */}
+                <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 bg-red-400 rounded-full hover:bg-red-500 transition-colors cursor-pointer"></div>
+                        <div className="w-3 h-3 bg-yellow-400 rounded-full hover:bg-yellow-500 transition-colors cursor-pointer"></div>
+                        <div className="w-3 h-3 bg-green-400 rounded-full hover:bg-green-500 transition-colors cursor-pointer"></div>
+                      </div>
+                      <div className="text-sm font-medium text-gray-600 ml-4">EmailAI Dashboard</div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-gray-500">Live</span>
+                    </div>
                   </div>
                 </div>
-                <div className="p-6">
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2">
-                      <div className="space-y-3">
-                        <div className="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Mail className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">Meeting Follow-up</div>
-                            <div className="text-xs text-gray-500">AI categorized as Work</div>
-                          </div>
+
+                {/* Dashboard Content */}
+                <div className="p-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Email List */}
+                    <div className="lg:col-span-2 space-y-4">
+                      {/* Email Item 1 */}
+                      <div className="group flex items-center space-x-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-l-4 border-blue-500 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                        <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                          <Mail className="w-6 h-6 text-white" />
                         </div>
-                        <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg border-l-4 border-green-500">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <CheckSquare className="w-4 h-4 text-green-600" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900">Task: Review proposal by Friday</div>
-                            <div className="text-xs text-gray-500">Extracted from email</div>
-                          </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Meeting Follow-up</div>
+                          <div className="text-sm text-gray-600">AI categorized as Work • 2 min ago</div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-xs text-blue-600 font-medium">High Priority</span>
+                        </div>
+                      </div>
+
+                      {/* Email Item 2 */}
+                      <div className="group flex items-center space-x-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border-l-4 border-green-500 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                        <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                          <CheckSquare className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 group-hover:text-green-600 transition-colors">Task: Review proposal by Friday</div>
+                          <div className="text-sm text-gray-600">Extracted from email • Due in 2 days</div>
+                        </div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                      </div>
+
+                      {/* Email Item 3 */}
+                      <div className="group flex items-center space-x-4 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border-l-4 border-purple-500 hover:shadow-lg transition-all duration-300 cursor-pointer">
+                        <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                          <Tags className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 group-hover:text-purple-600 transition-colors">Client Proposal Draft</div>
+                          <div className="text-sm text-gray-600">AI suggested improvements • 1 hour ago</div>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
                         </div>
                       </div>
                     </div>
-                    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg p-4">
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Bot className="w-5 h-5 text-indigo-600" />
-                        <span className="text-sm font-medium text-indigo-900">AI Assistant</span>
+
+                    {/* AI Assistant Panel */}
+                    <div className="bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 rounded-2xl p-6 border border-indigo-200/50 hover:shadow-xl transition-all duration-300">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center">
+                          <Bot className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-indigo-900">AI Assistant</span>
+                          <div className="flex items-center space-x-1 mt-1">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs text-indigo-600">Online</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-indigo-700">
-                        "I found 3 urgent emails and created 2 tasks for you. Would you like me to draft a response to the client inquiry?"
+                      
+                      <div className="space-y-3">
+                        <div className="bg-white/80 rounded-xl p-3 text-sm text-indigo-800 leading-relaxed">
+                          "I found <span className="font-semibold text-indigo-900">3 urgent emails</span> and created <span className="font-semibold text-indigo-900">2 tasks</span> for you."
+                        </div>
+                        <div className="bg-white/80 rounded-xl p-3 text-sm text-indigo-800 leading-relaxed">
+                          "Would you like me to draft a response to the client inquiry?"
+                        </div>
+                        
+                        <div className="flex space-x-2 mt-4">
+                          <Button size="sm" className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-lg flex-1">
+                            Yes, Draft It
+                          </Button>
+                          <Button size="sm" variant="outline" className="border-indigo-300 text-indigo-600 rounded-lg">
+                            Later
+                          </Button>
+                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Stats Bar */}
+                  <div className="mt-8 grid grid-cols-3 gap-6">
+                    <div className="text-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
+                      <div className="text-2xl font-bold text-blue-600">247</div>
+                      <div className="text-sm text-gray-600">Emails Organized</div>
+                    </div>
+                    <div className="text-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl">
+                      <div className="text-2xl font-bold text-green-600">18</div>
+                      <div className="text-sm text-gray-600">Tasks Created</div>
+                    </div>
+                    <div className="text-center p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
+                      <div className="text-2xl font-bold text-purple-600">5.2h</div>
+                      <div className="text-sm text-gray-600">Time Saved</div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="w-6 h-10 border-2 border-gray-400 rounded-full flex justify-center">
+            <div className="w-1 h-3 bg-gray-400 rounded-full mt-2 animate-pulse"></div>
           </div>
         </div>
       </section>
