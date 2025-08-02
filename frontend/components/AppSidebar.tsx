@@ -16,6 +16,8 @@ import {
   FileText,
   ChevronUp,
   Mail,
+  Trash2,
+  MoreHorizontal,
 } from "lucide-react"
 
 import {
@@ -36,7 +38,7 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { fetchCategories, createCategory, Category } from "@/lib/api/categories"
+import { fetchCategories, createCategory, deleteCategory, Category } from "@/lib/api/categories"
 import { useApp } from "./AppContext"
 import { AddCategoryModal } from "./email/AddCategoryModal"
 import { useComposeModal } from "@/components/email/ComposeEmail";
@@ -67,6 +69,7 @@ export function AppSidebar() {
   const [modalOpen, setModalOpen] = React.useState(false)
   const [modalLoading, setModalLoading] = React.useState(false)
   const [addAccountLoading, setAddAccountLoading] = React.useState(false)
+  const [deletingCategoryId, setDeletingCategoryId] = React.useState<string | null>(null)
   const { openCompose } = useComposeModal();
 
   React.useEffect(() => {
@@ -115,6 +118,30 @@ export function AppSidebar() {
     }
   }
 
+  const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
+    if (!confirm(`Are you sure you want to delete the category "${categoryName}"? This action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      setDeletingCategoryId(categoryId)
+      await deleteCategory(categoryId)
+      
+      // Remove the category from the local state
+      setCategories(prev => prev.filter(cat => cat.id !== categoryId))
+      
+      // If the deleted category was currently selected, clear the selection
+      if (currentCategory === categoryName) {
+        setCurrentCategory(null)
+      }
+    } catch (error) {
+      console.error("Failed to delete category:", error)
+      alert("Failed to delete category. Please try again.")
+    } finally {
+      setDeletingCategoryId(null)
+    }
+  }
+
   function handleLogout() {
     localStorage.removeItem("user")
     window.location.href = "/"
@@ -157,20 +184,22 @@ export function AppSidebar() {
           color: 'var(--sidebar-foreground)',
           borderColor: 'var(--sidebar-border)',
         }}
-        collapsible="none"
+        collapsible="icon"
       >
-        <SidebarHeader className="p-4 flex flex-col gap-4 w-full min-w-0 max-w-full overflow-x-hidden">
+        <SidebarHeader className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 w-full min-w-0 max-w-full overflow-x-hidden">
           <div className="flex items-center gap-2">
             {/* Email Agent logo */}
-            <Mail className="w-6 h-6" style={{ color: 'var(--primary)' }} />
-            <span className="text-xl font-semibold" style={{ color: 'var(--sidebar-foreground)' }}>Email Agent</span>
+            <Mail className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: 'var(--primary)' }} />
+            <span className="text-lg sm:text-xl font-semibold truncate" style={{ color: 'var(--sidebar-foreground)' }}>Email Agent</span>
           </div>
           <Button
-            className="w-full font-semibold rounded-full px-6 py-3 shadow transition text-base"
+            className="w-full font-semibold rounded-full px-4 sm:px-6 py-2 sm:py-3 shadow transition text-sm sm:text-base"
             style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}
             onClick={openCompose}
           >
-            <Plus className="w-5 h-5 mr-2" /> COMPOSE
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" /> 
+            <span className="hidden sm:inline">COMPOSE</span>
+            <span className="sm:hidden">NEW</span>
           </Button>
         </SidebarHeader>
         <SidebarContent className="flex-1 overflow-y-auto px-4 w-full min-w-0 max-w-full overflow-x-hidden hide-scrollbar">
@@ -258,33 +287,64 @@ export function AppSidebar() {
                         {categories.length > 0 ? (
                           categories.map((category) => {
                             const isActive = currentCategory === category.name
+                            const isDeleting = deletingCategoryId === category.id
                             return (
                               <SidebarMenuItem key={category.id}>
-                                <SidebarMenuButton
-                                  asChild
-                                  isActive={isActive}
-                                  className={isActive ? 'bg-[color:var(--sidebar-accent)]/20 text-[color:var(--primary)] font-medium' : 'hover:bg-[color:var(--sidebar-accent)]/10'}
-                                  style={isActive ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
-                                >
-                                  <Link 
-                                    href="#" 
-                                    className="flex items-center w-full max-w-full justify-between gap-2 truncate"
-                                    onClick={() => handleCategoryClick(category.name || '')}
+                                <div className="group flex items-center w-full">
+                                  <SidebarMenuButton
+                                    asChild
+                                    isActive={isActive}
+                                    className={`flex-1 ${isActive ? 'bg-[color:var(--sidebar-accent)]/20 text-[color:var(--primary)] font-medium' : 'hover:bg-[color:var(--sidebar-accent)]/10'}`}
+                                    style={isActive ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
                                   >
-                                    <span className="flex items-center gap-2 truncate">
-                                      <span 
-                                        className="w-2 h-2 rounded-full" 
-                                        style={{ background: category.color || '#3b82f6' }}
-                                      />
-                                      <span className="truncate">{category.name}</span>
-                                    </span>
-                                    {category.count && (
-                                      <span className="ml-auto bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 text-xs font-semibold truncate max-w-[48px] text-ellipsis overflow-hidden">
-                                        {category.count.toLocaleString()}
+                                    <Link 
+                                      href="#" 
+                                      className="flex items-center w-full max-w-full justify-between gap-2 truncate"
+                                      onClick={() => handleCategoryClick(category.name || '')}
+                                    >
+                                      <span className="flex items-center gap-2 truncate">
+                                        <span 
+                                          className="w-2 h-2 rounded-full" 
+                                          style={{ background: category.color || '#3b82f6' }}
+                                        />
+                                        <span className="truncate">{category.name}</span>
                                       </span>
-                                    )}
-                                  </Link>
-                                </SidebarMenuButton>
+                                      {category.count && (
+                                        <span className="ml-auto bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 text-xs font-semibold truncate max-w-[48px] text-ellipsis overflow-hidden">
+                                          {category.count.toLocaleString()}
+                                        </span>
+                                      )}
+                                    </Link>
+                                  </SidebarMenuButton>
+                                  
+                                  {/* Delete Button */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-zinc-500 hover:text-red-600"
+                                        disabled={isDeleting}
+                                      >
+                                        {isDeleting ? (
+                                          <div className="w-3 h-3 border border-zinc-400 border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                          <MoreHorizontal className="h-3 w-3" />
+                                        )}
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-40">
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeleteCategory(category.id, category.name || '')}
+                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                        disabled={isDeleting}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </SidebarMenuItem>
                             )
                           })

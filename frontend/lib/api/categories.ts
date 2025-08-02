@@ -29,4 +29,11 @@ export async function createCategory(categoryData: CreateCategoryData): Promise<
     data: categoryData,
   });
   return response.data;
+}
+
+export async function deleteCategory(categoryId: string): Promise<void> {
+  await apiRequest({
+    url: `/categories/${categoryId}`,
+    method: 'DELETE',
+  });
 } 
