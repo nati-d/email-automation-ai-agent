@@ -36,7 +36,9 @@ export default function EmailDetailPage() {
           setLoading(false);
         } catch (sentError) {
           console.error('Both email fetch attempts failed:', { regularError, sentError });
-          setError(sentError.message || regularError.message || "Failed to fetch email");
+          const regularErrorMessage = regularError instanceof Error ? regularError.message : "Failed to fetch regular email";
+          const sentErrorMessage = sentError instanceof Error ? sentError.message : "Failed to fetch sent email";
+          setError(sentErrorMessage || regularErrorMessage || "Failed to fetch email");
           setLoading(false);
         }
       }
