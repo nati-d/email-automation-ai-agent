@@ -343,6 +343,50 @@ async def get_sent_emails(
         has_prev=False
     )
 
+
+@router.get("/sent/{email_id}", response_model=EmailResponse)
+async def get_sent_email(
+    email_id: str,
+    current_user: UserDTO = Depends(get_current_user)
+) -> EmailResponse:
+    """Get a specific sent email by ID from the 'sent_email' collection"""
+    container = get_container()
+    email_repository = container.email_repository()
+    
+    # Fetch sent emails and find the specific one
+    sent_emails = await email_repository.find_sent_emails(
+        account_owner=current_user.email,
+        limit=1000  # Get all sent emails to find the specific one
+    )
+    
+    # Find the specific email by ID
+    target_email = None
+    for email in sent_emails:
+        if email.id == email_id:
+            target_email = email
+            break
+    
+    if not target_email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sent email not found"
+        )
+    
+    # Check if the user owns this email
+    if target_email.account_owner != current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have permission to access this email"
+        )
+    
+    return EmailResponse(
+        **{
+            **target_email.__dict__,
+            "sender": str(target_email.sender),
+            "recipients": [str(recipient) for recipient in target_email.recipients]
+        }
+    )
+
 @router.get("/{email_id}", response_model=EmailResponse)
 async def get_email(
     email_id: str,

@@ -1,7 +1,7 @@
 "use client";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { fetchEmailById, Email } from "../../../lib/api/email";
+import { fetchEmailById, fetchSentEmailById, Email } from "../../../lib/api/email";
 import { formatEmailDate } from "../../../lib/utils";
 import { EmailHeader } from "@/components/email/EmailHeader";
 import { EmailMetadata } from "@/components/email/EmailMetadata";
@@ -20,15 +20,29 @@ export default function EmailDetailPage() {
 
   useEffect(() => {
     setLoading(true);
-    fetchEmailById(email_id as string)
-      .then((data) => {
+    
+    const fetchEmail = async () => {
+      try {
+        // First try to fetch as a regular email
+        const data = await fetchEmailById(email_id as string);
         setEmail(data);
         setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message || "Failed to fetch email");
-        setLoading(false);
-      });
+      } catch (regularError) {
+        try {
+          // If regular email fetch fails, try to fetch as a sent email
+          console.log('Regular email fetch failed, trying sent email endpoint...');
+          const data = await fetchSentEmailById(email_id as string);
+          setEmail(data);
+          setLoading(false);
+        } catch (sentError) {
+          console.error('Both email fetch attempts failed:', { regularError, sentError });
+          setError(sentError.message || regularError.message || "Failed to fetch email");
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchEmail();
   }, [email_id]);
 
   if (loading) {

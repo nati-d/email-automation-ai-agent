@@ -10,7 +10,7 @@ import { useApp } from "./AppContext"
 export function NavBar() {
   const { user, search, setSearch } = useApp()
   const { toggleSidebar } = useSidebar()
-  
+
   return (
     <header
       className="flex items-center justify-between px-4 sm:px-6 py-3 border-b shadow-sm sticky top-0 z-10"
@@ -18,17 +18,17 @@ export function NavBar() {
     >
       <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
         {/* Sidebar Toggle Button */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleSidebar}
-          className="rounded-lg h-8 w-8 sm:h-9 sm:w-9 shrink-0" 
+          className="rounded-lg h-8 w-8 sm:h-9 sm:w-9 shrink-0"
           style={{ color: 'var(--muted-foreground)' }}
         >
           <Menu className="w-4 h-4 sm:w-5 sm:h-5" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-        
+
         <Search className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" style={{ color: 'var(--muted-foreground)' }} />
         <Input
           type="text"
@@ -48,7 +48,7 @@ export function NavBar() {
               {user?.name ? user.name.charAt(0).toUpperCase() : "A"}
             </AvatarFallback>
           </Avatar>
-          
+
           {/* Hover Tooltip */}
           <div className="absolute right-0 top-full mt-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50">
             <div className="font-medium">{user?.name || "User"}</div>

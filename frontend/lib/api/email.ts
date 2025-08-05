@@ -43,6 +43,15 @@ export async function fetchEmailById(emailId: string): Promise<Email> {
   return response.data;
 }
 
+export async function fetchSentEmailById(emailId: string): Promise<Email> {
+  const response = await apiRequest<Email>({
+    url: `/emails/sent/${emailId}`,
+    method: 'GET',
+  });
+  console.log(response.data);
+  return response.data;
+}
+
 export async function fetchInboxEmails(): Promise<Email[]> {
   const response = await apiRequest<{ emails: Email[] }>({
     url: '/emails/inbox',

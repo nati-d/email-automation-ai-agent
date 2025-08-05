@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { fetchEmails, fetchEmailsByCategory, fetchInboxEmails, fetchTaskEmails, fetchSentEmails, fetchStarredEmails, type Email as BaseEmail } from "../../lib/api/email";
-import { Star, StarOff, Mail, UserIcon, Tag, Plus, Reply } from "lucide-react"
+import { Star, StarOff, Mail, Tag, Plus, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../../lib/utils";
 import { useRouter } from "next/navigation";
@@ -41,7 +41,7 @@ const TABS = [
 ]
 
 export default function Dashboard() {
-  const { user, search, currentCategory, currentEmailType } = useApp()
+  const { user, search, currentCategory, currentEmailType, setCurrentEmailType } = useApp()
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,17 +50,46 @@ export default function Dashboard() {
   const router = useRouter();
   const { replyToEmail } = useComposeModal();
 
+  const handleTabClick = (tabValue: string) => {
+    setActiveTab(tabValue)
+    // Clear currentEmailType when clicking dashboard tabs so they take precedence
+    setCurrentEmailType("inbox")
+  }
+
   useEffect(() => {
     if (user) {
       setLoading(true)
       const fetchData = async () => {
         try {
           let data: Email[]
-          
+
           // If a category is selected, fetch emails by category
           if (currentCategory) {
             data = await fetchEmailsByCategory(currentCategory);
-          } 
+          }
+          // If currentEmailType is set from sidebar (sent, starred, etc.), use that
+          else if (currentEmailType && currentEmailType !== 'inbox') {
+            switch (currentEmailType) {
+              case "sent":
+                data = await fetchSentEmails();
+                // Add snippet field if missing for sent emails
+                data = data.map(email => ({
+                  ...email,
+                  snippet: email.snippet || email.body?.substring(0, 100) || '',
+                  read: email.read !== undefined ? email.read : true, // Assume sent emails are read
+                }));
+                break;
+              case "starred":
+                data = await fetchStarredEmails();
+                break;
+              case "tasks":
+                data = await fetchTaskEmails();
+                break;
+              default:
+                data = await fetchEmails();
+                break;
+            }
+          }
           // Otherwise, fetch emails based on the active tab
           else {
             switch (activeTab) {
@@ -76,7 +105,7 @@ export default function Dashboard() {
                 break;
             }
           }
-          
+
           setEmails(data)
         } catch (err: any) {
           setError(err.message || "Failed to fetch emails")
@@ -86,7 +115,7 @@ export default function Dashboard() {
       }
       fetchData()
     }
-  }, [user, currentCategory, activeTab])
+  }, [user, currentCategory, currentEmailType, activeTab])
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -104,9 +133,9 @@ export default function Dashboard() {
 
   const filteredEmails = emails.filter(
     (email) =>
-      email.subject.toLowerCase().includes(search.toLowerCase()) ||
-      email.sender.toLowerCase().includes(search.toLowerCase()) ||
-      email.snippet.toLowerCase().includes(search.toLowerCase()),
+      (email.subject || '').toLowerCase().includes(search.toLowerCase()) ||
+      (email.sender || '').toLowerCase().includes(search.toLowerCase()) ||
+      (email.snippet || '').toLowerCase().includes(search.toLowerCase()),
   )
 
   return (
@@ -135,9 +164,9 @@ export default function Dashboard() {
               style={activeTab === value
                 ? { color: 'var(--accent)', background: 'var(--accent-foreground)' }
                 : { color: 'var(--muted-foreground)' }}
-              onClick={() => setActiveTab(value)}
+              onClick={() => handleTabClick(value)}
             >
-              <Icon className="w-4 h-4" /> 
+              <Icon className="w-4 h-4" />
               <span>{label}</span>
               {activeTab === value && <span className="absolute bottom-0 left-0 w-full h-0.5 rounded-t-sm" style={{ background: 'var(--accent)' }} />}
             </button>
@@ -176,21 +205,34 @@ export default function Dashboard() {
                   key={email.id}
                   className={`group flex flex-col px-4 sm:px-6 py-3 hover:bg-[var(--muted)] transition-colors cursor-pointer text-sm ${email.read ? '' : 'font-bold'}`}
                   style={{ background: email.read ? 'var(--card)' : 'var(--accent-foreground)', color: 'var(--foreground)' }}
-                  onClick={() => router.push(`/email/${email.id}`)}
+                  onClick={() => {
+                    if (email.id) {
+                      router.push(`/email/${email.id}`);
+                    } else {
+                      console.error('Email ID is missing:', email);
+                    }
+                  }}
                 >
                   {/* Desktop Layout */}
-                  <div className="hidden md:flex items-center w-full" onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" className="accent-[var(--primary)] w-4 h-4 mr-4" />
-                    <button onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }} className="w-6 mr-2 flex items-center justify-center">
+                  <div className="hidden md:flex items-center w-full">
+                    <input 
+                      type="checkbox" 
+                      className="accent-[var(--primary)] w-4 h-4 mr-4" 
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }} 
+                      className="w-6 mr-2 flex items-center justify-center"
+                    >
                       {starred[email.id] ? (
                         <Star className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                       ) : (
                         <StarOff className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
                       )}
                     </button>
-                    <span className="flex-1 truncate">{email.sender}</span>
+                    <span className="flex-1 truncate">{email.sender || 'Unknown sender'}</span>
                     <span className="flex-[2] truncate">
-                      {email.subject} <span className="text-[var(--muted-foreground)] font-normal">- {email.snippet}</span>
+                      {email.subject || '(No subject)'} <span className="text-[var(--muted-foreground)] font-normal">- {email.snippet || ''}</span>
                     </span>
                     <span className="flex-1 truncate text-muted-foreground">{email.email_holder || '-'}</span>
                     <span className="w-20 text-right flex items-center justify-end gap-1" style={{ color: 'var(--muted-foreground)' }}>
@@ -212,12 +254,19 @@ export default function Dashboard() {
                   </div>
 
                   {/* Mobile Layout */}
-                  <div className="md:hidden" onClick={e => e.stopPropagation()}>
+                  <div className="md:hidden">
                     {/* Top Row: Sender, Star, Date */}
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <input type="checkbox" className="accent-[var(--primary)] w-4 h-4" />
-                        <button onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }} className="flex items-center justify-center">
+                        <input 
+                          type="checkbox" 
+                          className="accent-[var(--primary)] w-4 h-4" 
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); toggleStar(email.id); }} 
+                          className="flex items-center justify-center"
+                        >
                           {starred[email.id] ? (
                             <Star className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                           ) : (
@@ -225,7 +274,7 @@ export default function Dashboard() {
                           )}
                         </button>
                         <span className="font-medium truncate" style={{ color: 'var(--foreground)' }}>
-                          {email.sender}
+                          {email.sender || 'Unknown sender'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -239,7 +288,7 @@ export default function Dashboard() {
                     {/* Subject Line */}
                     <div className="mb-2">
                       <div className="font-medium text-sm truncate" style={{ color: 'var(--foreground)' }}>
-                        {email.subject}
+                        {email.subject || '(No subject)'}
                       </div>
                       {email.snippet && (
                         <div className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--muted-foreground)' }}>
@@ -279,10 +328,10 @@ export default function Dashboard() {
                             email.sentiment === 'positive'
                               ? '#22c55e'
                               : email.sentiment === 'negative'
-                              ? '#ef4444'
-                              : email.sentiment === 'neutral'
-                              ? '#facc15'
-                              : 'var(--muted-foreground)',
+                                ? '#ef4444'
+                                : email.sentiment === 'neutral'
+                                  ? '#facc15'
+                                  : 'var(--muted-foreground)',
                         }}
                         title={email.sentiment.charAt(0).toUpperCase() + email.sentiment.slice(1)}
                       />
@@ -312,7 +361,7 @@ export default function Dashboard() {
           </ul>
         </main>
       </div>
-      
+
       {/* Floating ChatBot */}
       <ChatBot />
     </ProtectedRoute>
