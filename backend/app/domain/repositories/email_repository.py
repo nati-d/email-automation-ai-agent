@@ -73,4 +73,24 @@ class EmailRepository(ABC):
     @abstractmethod
     async def find_sent_emails(self, account_owner: str, limit: int = 50) -> List[Email]:
         """Find sent emails from the 'sent_email' collection"""
+        pass
+    
+    @abstractmethod
+    async def find_draft_emails(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find draft emails for the user"""
+        pass
+    
+    @abstractmethod
+    async def save_draft(self, email: Email) -> Email:
+        """Save an email draft"""
+        pass
+    
+    @abstractmethod
+    async def update_draft(self, email: Email) -> Email:
+        """Update an existing draft"""
+        pass
+    
+    @abstractmethod
+    async def delete_draft(self, email_id: str, account_owner: str) -> bool:
+        """Delete a draft email"""
         pass 

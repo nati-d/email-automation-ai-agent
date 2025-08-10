@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Inbox,
   Star,
@@ -39,6 +40,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { fetchCategories, createCategory, deleteCategory, Category } from "@/lib/api/categories"
+import { getDraftCount, getInboxCount, getSentCount, getStarredCount } from "@/lib/api/email"
 import { useApp } from "./AppContext"
 import { AddCategoryModal } from "./email/AddCategoryModal"
 import { useComposeModal } from "@/components/email/ComposeEmail";
@@ -53,24 +55,29 @@ interface User {
   profilePicture?: string;
 }
 
-const SIDEBAR_ITEMS = [
-  { label: "Inbox", icon: Inbox, count: 150, active: true, href: "#" },
-  { label: "Starred", icon: Star, count: 0, href: "#" },
-  { label: "Sent", icon: Send, count: 0, href: "#" },
-  { label: "Drafts", icon: FileText, count: 0, href: "#" },
-  { label: "Important", icon: Tag, count: 0, href: "#" },
+const getSidebarItems = (inboxCount: number, starredCount: number, sentCount: number, draftCount: number) => [
+  { label: "Inbox", icon: Inbox, count: inboxCount, active: true, href: "/dashboard" },
+  { label: "Starred", icon: Star, count: starredCount, href: "/dashboard" },
+  { label: "Sent", icon: Send, count: sentCount, href: "/dashboard" },
+  { label: "Drafts", icon: FileText, count: draftCount, href: "/drafts" },
+  { label: "Important", icon: Tag, count: 0, href: "/dashboard" },
 ]
 
 export function AppSidebar() {
   const { toggleSidebar } = useSidebar()
-  const { currentCategory, setCurrentCategory, currentEmailType, setCurrentEmailType, user } = useApp()
+  const { currentCategory, setCurrentCategory, currentEmailType, setCurrentEmailType, user, refreshTrigger } = useApp()
   const [categories, setCategories] = React.useState<Category[]>([])
   const [loading, setLoading] = React.useState(true)
   const [modalOpen, setModalOpen] = React.useState(false)
   const [modalLoading, setModalLoading] = React.useState(false)
   const [addAccountLoading, setAddAccountLoading] = React.useState(false)
   const [deletingCategoryId, setDeletingCategoryId] = React.useState<string | null>(null)
+  const [draftCount, setDraftCount] = React.useState(0)
+  const [inboxCount, setInboxCount] = React.useState(0)
+  const [sentCount, setSentCount] = React.useState(0)
+  const [starredCount, setStarredCount] = React.useState(0)
   const { openCompose } = useComposeModal();
+  const router = useRouter();
 
   React.useEffect(() => {
     if (!user) return; // Only fetch if user is present
@@ -90,21 +97,55 @@ export function AppSidebar() {
     loadCategories()
   }, [user]) // Depend on user
 
-  const handleCategoryClick = (categoryName: string) => {
+  // Load email counts
+  React.useEffect(() => {
+    if (!user) return;
+    const loadEmailCounts = async () => {
+      try {
+        const [inbox, sent, starred, drafts] = await Promise.all([
+          getInboxCount(),
+          getSentCount(),
+          getStarredCount(),
+          getDraftCount()
+        ])
+        setInboxCount(inbox)
+        setSentCount(sent)
+        setStarredCount(starred)
+        setDraftCount(drafts)
+      } catch (error) {
+        console.error("Failed to fetch email counts:", error)
+        setInboxCount(0)
+        setSentCount(0)
+        setStarredCount(0)
+        setDraftCount(0)
+      }
+    }
+
+    loadEmailCounts()
+  }, [user, refreshTrigger]) // Update when refreshTrigger changes
+
+  const handleCategoryClick = (categoryName: string, e: React.MouseEvent) => {
+    e.preventDefault();
     setCurrentCategory(categoryName)
+    setCurrentEmailType("inbox") // Reset to inbox when selecting category
+    router.push("/dashboard") // Navigate to dashboard
   }
 
-  const handleInboxClick = () => {
+  const handleInboxClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     setCurrentCategory(null) // Clear category filter to show all emails
     setCurrentEmailType("inbox") // Set email type to inbox
+    router.push("/dashboard") // Navigate to dashboard
   }
 
-  const handleEmailTypeClick = (emailType: string) => {
+  const handleEmailTypeClick = (emailType: string, e: React.MouseEvent) => {
+    e.preventDefault();
     setCurrentCategory(null) // Clear category filter
     setCurrentEmailType(emailType.toLowerCase()) // Set the email type (sent, starred, etc.)
+    router.push("/dashboard") // Navigate to dashboard
   }
 
-  const handleAddCategory = async (categoryData: { name: string }) => {
+  const handleAddCategory = async (categoryData: { name: string; description?: string; color?: string }) => {
     try {
       setModalLoading(true)
       const newCategory = await createCategory(categoryData)
@@ -205,7 +246,7 @@ export function AppSidebar() {
         <SidebarContent className="flex-1 overflow-y-auto px-4 w-full min-w-0 max-w-full overflow-x-hidden hide-scrollbar">
           <SidebarGroup>
             <SidebarMenu>
-              {SIDEBAR_ITEMS.map(({ label, icon: Icon, count, active, href }) => (
+              {getSidebarItems(inboxCount, starredCount, sentCount, draftCount).map(({ label, icon: Icon, count, active, href }) => (
                 <SidebarMenuItem key={label}>
                   <SidebarMenuButton
                     asChild
@@ -213,7 +254,15 @@ export function AppSidebar() {
                     className={(label.toLowerCase() === currentEmailType) && !currentCategory ? 'relative bg-[color:var(--sidebar-accent)]/30 border-l-4 border-[color:var(--primary)] text-[color:var(--primary)] font-semibold' : 'hover:bg-[color:var(--sidebar-accent)]/20'}
                     style={(label.toLowerCase() === currentEmailType) && !currentCategory ? { background: 'rgba(25, 118, 210, 0.08)', borderLeft: '4px solid var(--primary)', color: 'var(--primary)', fontWeight: 600 } : {}}
                   >
-                    <Link href={href} className="flex items-center w-full max-w-full justify-between gap-2 truncate" onClick={label === "Inbox" ? handleInboxClick : () => handleEmailTypeClick(label)}>
+                    <Link 
+                      href={href} 
+                      className="flex items-center w-full max-w-full justify-between gap-2 truncate" 
+                      onClick={label === "Inbox" ? handleInboxClick : label === "Drafts" ? (e) => {
+                        e.preventDefault();
+                        console.log('Drafts link clicked, navigating to /drafts');
+                        router.push("/drafts");
+                      } : (e) => handleEmailTypeClick(label, e)}
+                    >
                       <span className="flex items-center gap-2 truncate">
                         <Icon className="w-5 h-5 shrink-0" />
                         <span className="truncate">{label}</span>
@@ -266,9 +315,9 @@ export function AppSidebar() {
                             style={!currentCategory ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
                           >
                             <Link 
-                              href="#" 
+                              href="/dashboard" 
                               className="flex items-center w-full max-w-full justify-between gap-2 truncate"
-                              onClick={() => handleCategoryClick('')}
+                              onClick={(e) => handleCategoryClick('', e)}
                             >
                               <span className="flex items-center gap-2 truncate">
                                 <span 
@@ -298,9 +347,9 @@ export function AppSidebar() {
                                     style={isActive ? { background: 'rgba(25, 118, 210, 0.15)', color: 'var(--primary)' } : {}}
                                   >
                                     <Link 
-                                      href="#" 
+                                      href="/dashboard" 
                                       className="flex items-center w-full max-w-full justify-between gap-2 truncate"
-                                      onClick={() => handleCategoryClick(category.name || '')}
+                                      onClick={(e) => handleCategoryClick(category.name || '', e)}
                                     >
                                       <span className="flex items-center gap-2 truncate">
                                         <span 

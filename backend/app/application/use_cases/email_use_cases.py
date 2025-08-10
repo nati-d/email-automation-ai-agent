@@ -247,7 +247,7 @@ class SendNewEmailUseCase(EmailUseCaseBase):
                         print(f"🔍 DEBUG: Found OAuth token, sending via Gmail API")
                         
                         success = await self.gmail_service.send_email_via_gmail(
-                            oauth_token=oauth_token,
+                            oauth_token=oauth_token,  # Pass the OAuth token directly
                             sender_email=sender_email,
                             recipients=recipients,
                             subject=subject,
@@ -410,7 +410,7 @@ class FetchInitialEmailsUseCase(EmailUseCaseBase):
             
             # Fetch emails from Gmail
             print("🔄 Calling gmail_service.fetch_recent_emails...")
-            emails = await self.gmail_service.fetch_recent_emails(oauth_token, user_email, limit)
+            emails = await self.gmail_service.fetch_recent_emails(oauth_token.token, user_email, limit)  # Pass the OAuth token
             print(f"📧 Gmail service returned {len(emails) if emails else 0} emails")
             
             if not emails:
@@ -554,7 +554,7 @@ class FetchStarredEmailsUseCase(EmailUseCaseBase):
             
             # Fetch starred emails from Gmail
             print("🔄 Calling gmail_service.fetch_starred_emails...")
-            emails = await self.gmail_service.fetch_starred_emails(oauth_token, user_email, limit)
+            emails = await self.gmail_service.fetch_starred_emails(oauth_token.token, user_email, limit)  # Pass the OAuth token
             print(f"⭐ Gmail service returned {len(emails) if emails else 0} starred emails")
             
             if not emails:
@@ -920,7 +920,7 @@ class FetchSentEmailsUseCase(EmailUseCaseBase):
             
             # Fetch sent emails from Gmail
             print("🔄 Calling gmail_service.fetch_sent_emails...")
-            emails = await self.gmail_service.fetch_sent_emails(oauth_token, user_email, limit)
+            emails = await self.gmail_service.fetch_sent_emails(oauth_token.token, user_email, limit)  # Pass the OAuth token
             print(f"📧 Gmail service returned {len(emails) if emails else 0} sent emails")
             
             if not emails:

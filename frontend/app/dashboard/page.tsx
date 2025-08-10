@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { fetchEmails, fetchEmailsByCategory, fetchInboxEmails, fetchTaskEmails, fetchSentEmails, fetchStarredEmails, type Email as BaseEmail } from "../../lib/api/email";
+import { fetchEmails, fetchEmailsByCategory, fetchInboxEmails, fetchTaskEmails, fetchSentEmails, fetchStarredEmails, fetchDrafts, type Email as BaseEmail } from "../../lib/api/email";
 import { Star, StarOff, Mail, Tag, Plus, Reply } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { formatEmailDate } from "../../lib/utils";
@@ -41,7 +41,7 @@ const TABS = [
 ]
 
 export default function Dashboard() {
-  const { user, search, currentCategory, currentEmailType, setCurrentEmailType } = useApp()
+  const { user, search, currentCategory, currentEmailType, setCurrentEmailType, refreshTrigger } = useApp()
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -85,6 +85,17 @@ export default function Dashboard() {
               case "tasks":
                 data = await fetchTaskEmails();
                 break;
+              case "drafts":
+                console.log('Fetching drafts for dashboard...');
+                data = await fetchDrafts();
+                console.log('Fetched drafts:', data.length);
+                // Add snippet field if missing for drafts
+                data = data.map(email => ({
+                  ...email,
+                  snippet: email.snippet || email.body?.substring(0, 100) || '',
+                  read: email.read !== undefined ? email.read : true, // Assume drafts are read
+                }));
+                break;
               default:
                 data = await fetchEmails();
                 break;
@@ -115,7 +126,7 @@ export default function Dashboard() {
       }
       fetchData()
     }
-  }, [user, currentCategory, currentEmailType, activeTab])
+  }, [user, currentCategory, currentEmailType, activeTab, refreshTrigger])
 
   function toggleStar(id: string) {
     setStarred((prev) => ({ ...prev, [id]: !prev[id] }))

@@ -3,13 +3,14 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { X, Plus } from "lucide-react";
 
 interface AddCategoryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (categoryData: { name: string }) => void;
+  onSubmit: (categoryData: { name: string; description?: string; color?: string }) => void;
   loading?: boolean;
 }
 
@@ -20,13 +21,21 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
   loading = false,
 }) => {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [color, setColor] = useState("#3b82f6");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSubmit({ name: name.trim() });
+      onSubmit({ 
+        name: name.trim(),
+        description: description.trim() || undefined,
+        color: color
+      });
       // Reset form
       setName("");
+      setDescription("");
+      setColor("#3b82f6");
     }
   };
 
@@ -35,6 +44,8 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
       onClose();
       // Reset form on close
       setName("");
+      setDescription("");
+      setColor("#3b82f6");
     }
   };
 
@@ -74,6 +85,51 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({
               disabled={loading}
               className="w-full"
             />
+          </div>
+
+          {/* Description Field */}
+          <div className="space-y-2">
+            <Label htmlFor="category-description" className="text-sm font-medium text-gray-700">
+              Description
+            </Label>
+            <Textarea
+              id="category-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe what emails belong to this category (helps with AI classification)"
+              disabled={loading}
+              className="w-full min-h-[80px] resize-none"
+              maxLength={200}
+            />
+            <p className="text-xs text-gray-500">
+              {description.length}/200 characters. This helps AI classify emails automatically.
+            </p>
+          </div>
+
+          {/* Color Field */}
+          <div className="space-y-2">
+            <Label htmlFor="category-color" className="text-sm font-medium text-gray-700">
+              Color
+            </Label>
+            <div className="flex items-center gap-3">
+              <input
+                id="category-color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                disabled={loading}
+                className="w-12 h-10 rounded border border-gray-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+              <Input
+                type="text"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                placeholder="#3b82f6"
+                disabled={loading}
+                className="flex-1"
+                pattern="^#[0-9A-Fa-f]{6}$"
+              />
+            </div>
           </div>
 
           {/* Actions */}

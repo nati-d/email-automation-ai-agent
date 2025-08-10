@@ -25,6 +25,7 @@ from app.presentation.api.oauth_controller import router as oauth_router
 from app.presentation.api.category_controller import router as category_router
 from app.presentation.api.user_account_controller import router as user_account_router
 from app.presentation.api.llm_controller import router as llm_router
+from app.presentation.api.draft_controller import router as draft_router
 
 
 @asynccontextmanager
@@ -94,6 +95,10 @@ tags_metadata = [
         "name": "LLM",
         "description": "LLM-powered features including email composition, sentiment analysis, and AI chat capabilities.",
     },
+    {
+        "name": "drafts",
+        "description": "Email draft management with Gmail integration for creating, updating, and sending drafts.",
+    },
 ]
 
 # Create FastAPI instance with clean architecture configuration
@@ -152,6 +157,7 @@ app.include_router(oauth_router, prefix=settings.api_prefix, tags=["auth"])
 app.include_router(category_router, prefix=settings.api_prefix, tags=["categories"])
 app.include_router(user_account_router, prefix=settings.api_prefix, tags=["user-accounts"])
 app.include_router(llm_router, prefix=settings.api_prefix, tags=["LLM"])
+app.include_router(draft_router, prefix=settings.api_prefix, tags=["drafts"])
 
 
 @app.get("/", 
@@ -199,7 +205,8 @@ async def root():
         "endpoints": {
             "health": f"{settings.api_prefix}/health",
             "emails": f"{settings.api_prefix}/emails",
-            "auth": f"{settings.api_prefix}/auth"
+            "auth": f"{settings.api_prefix}/auth",
+            "drafts": f"{settings.api_prefix}/drafts"
         },
         "status": "online"
     }

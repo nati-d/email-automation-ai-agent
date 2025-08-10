@@ -35,6 +35,10 @@ from ...application.use_cases.email_use_cases import (
     DeleteEmailUseCase, SendEmailUseCase, SendNewEmailUseCase, ScheduleEmailUseCase,
     ListEmailsUseCase, FetchInitialEmailsUseCase, SummarizeEmailUseCase, SummarizeMultipleEmailsUseCase
 )
+from ...application.use_cases.draft_use_cases import (
+    CreateDraftUseCase, UpdateDraftUseCase, DeleteDraftUseCase,
+    ListDraftsUseCase
+)
 from ...application.use_cases.user_use_cases import (
     CreateUserUseCase, GetUserUseCase, UpdateUserUseCase,
     DeleteUserUseCase, AuthenticateUserUseCase
@@ -95,6 +99,12 @@ class Container:
         self._summarize_multiple_emails_use_case: Optional[SummarizeMultipleEmailsUseCase] = None
         self._fetch_starred_emails_use_case: Optional[FetchStarredEmailsUseCase] = None
         self._fetch_sent_emails_use_case: Optional[__import__('app.application.use_cases.email_use_cases', fromlist=['FetchSentEmailsUseCase']).FetchSentEmailsUseCase] = None
+        
+        # Draft use cases
+        self._create_draft_use_case: Optional[CreateDraftUseCase] = None
+        self._update_draft_use_case: Optional[UpdateDraftUseCase] = None
+        self._delete_draft_use_case: Optional[DeleteDraftUseCase] = None
+        self._list_drafts_use_case: Optional[ListDraftsUseCase] = None
         
         # User use cases
         self._create_user_use_case: Optional[CreateUserUseCase] = None
@@ -170,7 +180,11 @@ class Container:
     def gmail_service(self) -> GmailService:
         """Get Gmail service"""
         if self._gmail_service is None:
-            self._gmail_service = GmailService()
+            settings = self.settings()
+            self._gmail_service = GmailService(
+                client_id=settings.google_client_id,
+                client_secret=settings.google_client_secret
+            )
         return self._gmail_service
     
     def llm_service(self) -> LLMService:
@@ -655,7 +669,8 @@ class Container:
             self._recategorize_emails_use_case = RecategorizeEmailsUseCase(
                 self.email_repository(),
                 self.category_repository(),
-                self.user_repository()
+                self.user_repository(),
+                self.llm_service()  # Add LLM service for AI categorization
             )
         return self._recategorize_emails_use_case
     
@@ -701,6 +716,48 @@ class Container:
         if self._add_account_if_not_exists_use_case is None:
             self._add_account_if_not_exists_use_case = AddAccountIfNotExistsUseCase(self.user_account_repository())
         return self._add_account_if_not_exists_use_case
+    
+    # Draft Use Cases
+    def create_draft_use_case(self) -> CreateDraftUseCase:
+        """Get create draft use case"""
+        if self._create_draft_use_case is None:
+            self._create_draft_use_case = CreateDraftUseCase(
+                email_repository=self.email_repository(),
+                gmail_service=self.gmail_service(),
+                oauth_repository=self.oauth_repository()
+            )
+        return self._create_draft_use_case
+    
+    def update_draft_use_case(self) -> UpdateDraftUseCase:
+        """Get update draft use case"""
+        if self._update_draft_use_case is None:
+            self._update_draft_use_case = UpdateDraftUseCase(
+                email_repository=self.email_repository(),
+                gmail_service=self.gmail_service(),
+                oauth_repository=self.oauth_repository()
+            )
+        return self._update_draft_use_case
+    
+    def delete_draft_use_case(self) -> DeleteDraftUseCase:
+        """Get delete draft use case"""
+        if self._delete_draft_use_case is None:
+            self._delete_draft_use_case = DeleteDraftUseCase(
+                email_repository=self.email_repository(),
+                gmail_service=self.gmail_service(),
+                oauth_repository=self.oauth_repository()
+            )
+        return self._delete_draft_use_case
+    
+    def list_drafts_use_case(self) -> ListDraftsUseCase:
+        """Get list drafts use case"""
+        if self._list_drafts_use_case is None:
+            self._list_drafts_use_case = ListDraftsUseCase(
+                email_repository=self.email_repository()
+            )
+        return self._list_drafts_use_case
+    
+# Removed send_draft_use_case and sync_drafts_with_gmail_use_case
+    # These use cases were removed in favor of using the existing sendEmail functionality
     
     def initialize(self) -> None:
         """Initialize all services"""

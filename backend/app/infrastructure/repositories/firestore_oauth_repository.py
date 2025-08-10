@@ -136,8 +136,8 @@ class FirestoreOAuthRepository(OAuthRepository):
     async def find_session_by_state(self, state: str) -> Optional[OAuthSession]:
         """Find OAuth session by state parameter"""
         query = self.db.collection(self.collection_name)\
-            .where("state", "==", state)\
-            .where("is_active", "==", True)\
+            .where(filter=firestore.FieldFilter("state", "==", state))\
+            .where(filter=firestore.FieldFilter("is_active", "==", True))\
             .limit(1)
         
         docs = list(query.stream())
@@ -150,8 +150,8 @@ class FirestoreOAuthRepository(OAuthRepository):
     async def find_active_session_by_user_id(self, user_id: str) -> Optional[OAuthSession]:
         """Find active OAuth session for a user"""
         query = self.db.collection(self.collection_name)\
-            .where("user_id", "==", user_id)\
-            .where("is_active", "==", True)\
+            .where(filter=firestore.FieldFilter("user_id", "==", user_id))\
+            .where(filter=firestore.FieldFilter("is_active", "==", True))\
             .limit(1)
         
         docs = list(query.stream())
@@ -185,11 +185,25 @@ class FirestoreOAuthRepository(OAuthRepository):
         doc_ref.delete()
         return True
     
+    async def find_by_user_email(self, user_email: str) -> Optional[OAuthSession]:
+        """Find active OAuth session by user email"""
+        query = self.db.collection(self.collection_name)\
+            .where(filter=firestore.FieldFilter("user_info.email", "==", user_email))\
+            .where(filter=firestore.FieldFilter("is_active", "==", True))\
+            .limit(1)
+        
+        docs = list(query.stream())
+        if not docs:
+            return None
+        
+        doc = docs[0]
+        return self._doc_to_entity(doc.id, doc.to_dict())
+    
     async def deactivate_user_sessions(self, user_id: str) -> bool:
         """Deactivate all sessions for a user"""
         query = self.db.collection(self.collection_name)\
-            .where("user_id", "==", user_id)\
-            .where("is_active", "==", True)
+            .where(filter=firestore.FieldFilter("user_id", "==", user_id))\
+            .where(filter=firestore.FieldFilter("is_active", "==", True))
         
         docs = list(query.stream())
         

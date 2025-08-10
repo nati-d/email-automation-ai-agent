@@ -10,9 +10,10 @@ interface EmailHeaderProps {
   sender: string;
   date: string;
   onBack: () => void;
+  isDraft?: boolean;
 }
 
-export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date, onBack }) => (
+export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date, onBack, isDraft = false }) => (
   <header className="flex items-center justify-between py-4 px-2 bg-card shadow-sm">
     <div className="flex items-center gap-4">
       <Tooltip>
@@ -35,7 +36,7 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
           {subject || "(No subject)"}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {sender} • {date}
+          {isDraft ? `Draft • ${date}` : `${sender} • ${date}`}
         </p>
       </div>
     </div>

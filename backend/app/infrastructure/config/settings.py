@@ -56,8 +56,13 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
         "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.send"
+        "https://www.googleapis.com/auth/gmail.send",
+        "https://www.googleapis.com/auth/gmail.compose",
+        "https://www.googleapis.com/auth/gmail.modify"
     ]
+    # OAuth token settings
+    oauth_token_refresh_threshold_minutes: int = int(os.getenv("OAUTH_TOKEN_REFRESH_THRESHOLD_MINUTES", "5"))
+    oauth_access_type: str = os.getenv("OAUTH_ACCESS_TYPE", "offline")  # Request offline access for refresh tokens
     frontend_url: str = os.getenv("FRONTEND_URL", "https://frontend-service-813842978116.us-central1.run.app")
     # frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     

@@ -114,22 +114,32 @@ class GoogleOAuthService:
         
         print(f"✅ Access token received: {credentials.token[:20]}...")
         
-        # Calculate expires_in from credentials
-        # Extend session to 30 days (30 * 24 * 60 * 60 = 2,592,000 seconds)
-        SESSION_DURATION_DAYS = 30
-        SESSION_DURATION_SECONDS = SESSION_DURATION_DAYS * 24 * 60 * 60  # 30 days in seconds
+        # Calculate expires_in from Google's actual token expiration
+        # Google access tokens expire in 1 hour, but we'll extend our session to 1 day
+        # and rely on refresh tokens for long-term access
         
-        expires_in = SESSION_DURATION_SECONDS  # Default to 30 days
+        GOOGLE_TOKEN_EXPIRES_IN = 3600  # Google's 1-hour limit
+        SESSION_DURATION_HOURS = 24     # Our session duration: 1 day
+        SESSION_DURATION_SECONDS = SESSION_DURATION_HOURS * 3600  # 24 hours in seconds
+        
+        # Use Google's actual expiration for the access token
+        google_expires_in = GOOGLE_TOKEN_EXPIRES_IN
         if credentials.expiry:
             from datetime import datetime
-            google_expires_in = int((credentials.expiry - datetime.utcnow()).total_seconds())
-            if google_expires_in <= 0:
-                expires_in = SESSION_DURATION_SECONDS  # Fallback if already expired
+            calculated_expires_in = int((credentials.expiry - datetime.utcnow()).total_seconds())
+            if calculated_expires_in > 0:
+                google_expires_in = calculated_expires_in
+                print(f"🔄 Using Google's actual token expiration: {google_expires_in} seconds ({google_expires_in/3600:.1f} hours)")
             else:
-                # Use the longer of Google's expiration or our 30-day session
-                expires_in = max(google_expires_in, SESSION_DURATION_SECONDS)
+                print(f"⚠️ Google token already expired, using default: {google_expires_in} seconds")
+        else:
+            print(f"🔄 No expiry from Google, using default: {google_expires_in} seconds")
         
-        print(f"🔄 Setting session expiration to {SESSION_DURATION_DAYS} days ({expires_in} seconds)")
+        # For our OAuth token, we'll use Google's expiration but ensure we have refresh capability
+        expires_in = google_expires_in
+        
+        print(f"✅ Access token will expire in {expires_in} seconds ({expires_in/60:.1f} minutes)")
+        print(f"🔄 Session will be valid for {SESSION_DURATION_HOURS} hours with refresh token")
         
         # Create OAuth token value object
         return OAuthToken.create(

@@ -582,10 +582,11 @@ class ListCategoriesUseCase(CategoryUseCaseBase):
 class RecategorizeEmailsUseCase:
     """Use case for re-categorizing emails when categories change"""
     
-    def __init__(self, email_repository: EmailRepository, category_repository: CategoryRepository, user_repository: UserRepository):
+    def __init__(self, email_repository: EmailRepository, category_repository: CategoryRepository, user_repository: UserRepository, llm_service=None):
         self.email_repository = email_repository
         self.category_repository = category_repository
         self.user_repository = user_repository
+        self.llm_service = llm_service
     
     async def execute(self, user_id: str) -> int:
         """Re-categorize all inbox emails for a user"""
@@ -601,11 +602,10 @@ class RecategorizeEmailsUseCase:
             user_email = str(user.email)
             print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] User email: {user_email}")
             
-            # Get user's active categories
+            # Get user's active categories with descriptions
             categories = await self.category_repository.find_active_by_user_id(user_id)
-            category_names = [cat.name.lower() for cat in categories]
             
-            print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Active categories: {category_names}")
+            print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Active categories: {[cat.name for cat in categories]}")
             
             # Get all inbox emails for the user by email address
             emails = await self.email_repository.find_by_recipient(EmailAddress.create(user_email), limit=1000)
@@ -616,8 +616,8 @@ class RecategorizeEmailsUseCase:
             recategorized_count = 0
             
             for email in inbox_emails:
-                # Re-categorize the email based on current categories
-                new_category = self._determine_category(email, category_names)
+                # Re-categorize the email based on current categories with descriptions
+                new_category = self._determine_category_with_ai(email, categories)
                 if new_category != email.category:
                     print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Email {email.id}: {email.category} -> {new_category}")
                     email.update_category(new_category)
@@ -635,6 +635,45 @@ class RecategorizeEmailsUseCase:
             import traceback
             print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Full traceback: {traceback.format_exc()}")
             raise
+    
+    def _determine_category_with_ai(self, email, categories) -> str:
+        """Determine the best category for an email using AI with category descriptions"""
+        print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] _determine_category_with_ai called for email {email.id}")
+        
+        # If LLM service is available and we have categories with descriptions, use AI
+        if self.llm_service and categories:
+            try:
+                # Prepare categories for AI
+                category_data = []
+                for cat in categories:
+                    category_data.append({
+                        'name': cat.name,
+                        'description': cat.description or f"General {cat.name.lower()} related emails"
+                    })
+                
+                print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Using AI categorization with {len(category_data)} categories")
+                
+                # Use AI to categorize
+                ai_category = self.llm_service.categorize_email_with_categories(
+                    email_content=email.body or "",
+                    email_subject=email.subject or "",
+                    sender=str(email.sender),
+                    recipient=str(email.recipients[0]) if email.recipients else "",
+                    categories=category_data
+                )
+                
+                print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] AI suggested category: {ai_category}")
+                return ai_category
+                
+            except Exception as e:
+                print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] AI categorization failed: {e}")
+                # Fall back to keyword-based categorization
+                pass
+        
+        # Fallback to keyword-based categorization
+        print(f"🔧 DEBUG: [RecategorizeEmailsUseCase] Using fallback keyword-based categorization")
+        category_names = [cat.name.lower() for cat in categories]
+        return self._determine_category(email, category_names)
     
     def _determine_category(self, email, category_names: List[str]) -> str:
         """Determine the best category for an email based on available categories with enhanced precision"""

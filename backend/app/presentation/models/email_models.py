@@ -179,4 +179,117 @@ class EmailSummaryResponse(BaseModel):
     summary: Optional[str] = None
     sentiment: Optional[str] = None
     key_points: Optional[List[str]] = None
-    action_items: Optional[List[str]] = None 
+    action_items: Optional[List[str]] = None
+
+
+class CreateDraftRequest(BaseModel):
+    """Request model for creating email drafts"""
+    recipients: List[EmailStr] = Field(..., min_items=1, max_items=100, description="List of recipient email addresses")
+    subject: str = Field("", max_length=200, description="Email subject (can be empty for drafts)")
+    body: str = Field("", max_length=50000, description="Email body text (can be empty for drafts)")
+    html_body: Optional[str] = Field(None, max_length=100000, description="Email HTML body")
+    sync_with_gmail: bool = Field(False, description="Whether to sync with Gmail")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "recipients": ["user@example.com"],
+                "subject": "Draft Email Subject",
+                "body": "This is a draft email body.",
+                "html_body": "<p>This is a draft email body.</p>",
+                "sync_with_gmail": True
+            }
+        }
+
+
+class UpdateDraftRequest(BaseModel):
+    """Request model for updating email drafts"""
+    recipients: Optional[List[EmailStr]] = Field(None, max_items=100, description="List of recipient email addresses")
+    subject: Optional[str] = Field(None, max_length=200, description="Email subject (can be empty for drafts)")
+    body: Optional[str] = Field(None, max_length=50000, description="Email body text (can be empty for drafts)")
+    html_body: Optional[str] = Field(None, max_length=100000, description="Email HTML body")
+    sync_with_gmail: bool = Field(False, description="Whether to sync with Gmail")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "subject": "Updated Draft Subject",
+                "body": "Updated draft body content.",
+                "sync_with_gmail": True
+            }
+        }
+
+
+class DraftResponse(BaseModel):
+    """Response model for draft operations"""
+    id: str
+    sender: str
+    recipients: List[str]
+    subject: str
+    body: str
+    html_body: Optional[str] = None
+    status: str = "draft"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = {}
+    account_owner: Optional[str] = None
+    gmail_draft_id: Optional[str] = None
+    synced_with_gmail: bool = False
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "id": "draft123",
+                "sender": "user@example.com",
+                "recipients": ["recipient@example.com"],
+                "subject": "Draft Email",
+                "body": "Draft content",
+                "status": "draft",
+                "created_at": "2024-01-15T10:30:00Z",
+                "updated_at": "2024-01-15T10:35:00Z",
+                "synced_with_gmail": True
+            }
+        }
+
+
+class DraftListResponse(PaginationResponse):
+    """Response model for draft list operations"""
+    drafts: List[DraftResponse]
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "drafts": [
+                    {
+                        "id": "draft123",
+                        "sender": "user@example.com",
+                        "recipients": ["recipient@example.com"],
+                        "subject": "Draft Email",
+                        "body": "Draft content",
+                        "status": "draft",
+                        "created_at": "2024-01-15T10:30:00Z"
+                    }
+                ],
+                "total_count": 1,
+                "page": 1,
+                "page_size": 50,
+                "has_next": False,
+                "has_previous": False
+            }
+        }
+
+
+class DraftActionResponse(BaseModel):
+    """Response model for draft actions (send, delete, etc.)"""
+    success: bool
+    message: str
+    draft_id: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Draft sent successfully",
+                "draft_id": "draft123"
+            }
+        } 

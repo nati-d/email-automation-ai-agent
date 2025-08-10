@@ -119,6 +119,16 @@ class FirestoreEmailRepository(EmailRepository):
         
         return self._doc_to_entity(doc.id, doc.to_dict())
     
+    async def find_draft_by_id(self, draft_id: str) -> Optional[Email]:
+        """Find draft by ID from the drafts collection"""
+        doc_ref = self.db.collection("drafts").document(draft_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return None
+        
+        return self._doc_to_entity(doc.id, doc.to_dict())
+    
     async def find_by_sender(self, sender: EmailAddress, limit: int = 50) -> List[Email]:
         """Find emails by sender"""
         # Simple query without ordering to avoid index requirement
@@ -246,4 +256,63 @@ class FirestoreEmailRepository(EmailRepository):
         
         # Sort in Python by created_at (descending)
         emails.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
-        return emails 
+        return emails
+    
+    async def find_draft_emails(self, account_owner: str, limit: int = 50) -> List[Email]:
+        """Find draft emails for the user"""
+        query = self.db.collection("drafts")\
+            .where("account_owner", "==", account_owner)\
+            .limit(limit)
+        
+        docs = query.stream()
+        emails = [self._doc_to_entity(doc.id, doc.to_dict()) for doc in docs]
+        
+        # Sort in Python by updated_at (descending) for drafts
+        emails.sort(key=lambda x: x.updated_at or datetime.min, reverse=True)
+        return emails
+    
+    async def save_draft(self, email: Email) -> Email:
+        """Save an email draft to the 'drafts' collection"""
+        doc_data = self._entity_to_doc(email)
+        doc_data["created_at"] = firestore.SERVER_TIMESTAMP
+        doc_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        
+        if email.id:
+            # Update existing draft
+            doc_ref = self.db.collection("drafts").document(email.id)
+            doc_ref.set(doc_data)
+        else:
+            # Create new draft
+            doc_ref = self.db.collection("drafts").add(doc_data)
+            email.id = doc_ref[1].id
+        
+        return email
+    
+    async def update_draft(self, email: Email) -> Email:
+        """Update an existing draft"""
+        if not email.id:
+            raise ValueError("Email ID is required for draft update")
+        
+        doc_data = self._entity_to_doc(email)
+        doc_data["updated_at"] = firestore.SERVER_TIMESTAMP
+        
+        doc_ref = self.db.collection("drafts").document(email.id)
+        doc_ref.update(doc_data)
+        
+        return email
+    
+    async def delete_draft(self, email_id: str, account_owner: str) -> bool:
+        """Delete a draft email"""
+        doc_ref = self.db.collection("drafts").document(email_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return False
+        
+        # Verify ownership
+        doc_data = doc.to_dict()
+        if doc_data.get("account_owner") != account_owner:
+            return False
+        
+        doc_ref.delete()
+        return True 

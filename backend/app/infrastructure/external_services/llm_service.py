@@ -617,6 +617,152 @@ class LLMService:
             print(f"🔧 DEBUG: [LLMService] Full traceback: {traceback.format_exc()}")
             return 'inbox'
 
+    def categorize_email_with_categories(
+        self,
+        email_content: str,
+        email_subject: str = "",
+        sender: str = "",
+        recipient: str = "",
+        categories: List[dict] = None
+    ) -> str:
+        """
+        Categorize email using custom categories with descriptions.
+        
+        Args:
+            email_content: The email body content
+            email_subject: The email subject line
+            sender: The sender's email address
+            recipient: The recipient's email address
+            categories: List of category dicts with 'name' and 'description' keys
+            
+        Returns:
+            The best matching category name or 'uncategorized'
+        """
+        print(f"🔧 DEBUG: [LLMService] categorize_email_with_categories called")
+        print(f"🔧 DEBUG: [LLMService] email_content length: {len(email_content)}")
+        print(f"🔧 DEBUG: [LLMService] email_subject: {email_subject}")
+        print(f"🔧 DEBUG: [LLMService] categories: {categories}")
+        
+        if not categories:
+            print(f"🔧 DEBUG: [LLMService] No categories provided, returning 'uncategorized'")
+            return 'uncategorized'
+        
+        # Build category descriptions for the AI
+        category_descriptions = []
+        category_names = []
+        for cat in categories:
+            name = cat.get('name', '')
+            description = cat.get('description', '')
+            category_names.append(name)
+            if description:
+                category_descriptions.append(f"- {name}: {description}")
+            else:
+                category_descriptions.append(f"- {name}: General {name.lower()} related emails")
+        
+        categories_text = "\n".join(category_descriptions)
+        category_names_list = ", ".join([f'"{name}"' for name in category_names])
+        
+        system_instruction = (
+            "You are an expert email categorizer. Analyze the email content and determine which category "
+            "it best fits into based on the provided category descriptions. "
+            "You MUST respond with ONLY valid JSON in the exact format specified. "
+            "Do not include any markdown formatting, explanations, or additional text. "
+            "The response must be parseable JSON with this exact structure: "
+            '{"category": "category_name", "reason": "brief explanation of why this category was chosen", "confidence": 0.85}'
+        )
+        
+        # Build context for better analysis
+        context_parts = []
+        if email_subject:
+            context_parts.append(f"Subject: {email_subject}")
+        if sender:
+            context_parts.append(f"From: {sender}")
+        if recipient:
+            context_parts.append(f"To: {recipient}")
+        
+        context = "\n".join(context_parts)
+        
+        query = f"""Categorize this email into one of the following categories:
+
+Available Categories:
+{categories_text}
+
+Email to categorize:
+{context}
+
+Content:
+{email_content}
+
+Choose the BEST matching category from: {category_names_list}
+If none fit well, use "uncategorized"
+
+Return ONLY this JSON structure:
+{{"category": "category_name", "reason": "brief explanation", "confidence": 0.85}}"""
+        
+        print(f"🔧 DEBUG: [LLMService] query length: {len(query)}")
+        print(f"🔧 DEBUG: [LLMService] query preview: {query[:500]}...")
+        
+        try:
+            print(f"🔧 DEBUG: [LLMService] Calling generate_content for custom categorization...")
+            response = self.generate_content(
+                system_instruction=system_instruction,
+                query=query,
+                response_type="text/plain"
+            )
+            print(f"🔧 DEBUG: [LLMService] generate_content returned: {response[:200]}...")
+            
+            # Parse JSON response
+            print(f"🔧 DEBUG: [LLMService] Parsing JSON response for custom categorization...")
+            result = json.loads(response)
+            print(f"🔧 DEBUG: [LLMService] Parsed JSON: {result}")
+            
+            category = result.get('category', 'uncategorized')
+            reason = result.get('reason', 'No reason provided')
+            confidence = result.get('confidence', 0.0)
+            
+            # Validate category is in the provided list
+            if category not in category_names and category != 'uncategorized':
+                print(f"🔧 DEBUG: [LLMService] Invalid category '{category}', defaulting to 'uncategorized'")
+                category = 'uncategorized'
+            
+            print(f"🔧 DEBUG: [LLMService] Final category: {category}")
+            print(f"🔧 DEBUG: [LLMService] Reason: {reason}")
+            print(f"🔧 DEBUG: [LLMService] Confidence: {confidence}")
+            
+            return category
+            
+        except json.JSONDecodeError as e:
+            print(f"🔧 DEBUG: [LLMService] JSON decode error in custom categorization: {e}")
+            print(f"🔧 DEBUG: [LLMService] Raw response: {response}")
+            
+            # Try to extract JSON from the response
+            try:
+                import re
+                json_pattern = r'\{[^{}]*"category"[^{}]*"reason"[^{}]*\}'
+                json_match = re.search(json_pattern, response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    print(f"🔧 DEBUG: [LLMService] Found JSON pattern: {json_str}")
+                    extracted_result = json.loads(json_str)
+                    category = extracted_result.get('category', 'uncategorized')
+                    if category not in category_names and category != 'uncategorized':
+                        category = 'uncategorized'
+                    print(f"🔧 DEBUG: [LLMService] Successfully extracted category: {category}")
+                    return category
+            except Exception as extract_error:
+                print(f"🔧 DEBUG: [LLMService] Failed to extract JSON: {extract_error}")
+            
+            # Return fallback
+            print(f"🔧 DEBUG: [LLMService] Returning fallback category: uncategorized")
+            return 'uncategorized'
+            
+        except Exception as e:
+            print(f"🔧 DEBUG: [LLMService] categorize_email_with_categories failed: {e}")
+            print(f"🔧 DEBUG: [LLMService] Error type: {type(e).__name__}")
+            import traceback
+            print(f"🔧 DEBUG: [LLMService] Full traceback: {traceback.format_exc()}")
+            return 'uncategorized'
+
     # ------------------------------------------------------------------
     # Utility Methods
     # ------------------------------------------------------------------

@@ -21,6 +21,8 @@ interface AppContextType {
   setCurrentCategory: (category: string | null) => void;
   currentEmailType: string;
   setCurrentEmailType: (emailType: string) => void;
+  refreshTrigger: number;
+  triggerRefresh: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -30,6 +32,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState("")
   const [currentCategory, setCurrentCategory] = useState<string | null>(null)
   const [currentEmailType, setCurrentEmailType] = useState<string>("inbox") // Default to inbox
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  
+  const triggerRefresh = () => {
+    setRefreshTrigger(prev => prev + 1)
+  }
 
   useEffect(() => {
     const stored = localStorage.getItem("user")
@@ -47,7 +54,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       currentCategory, 
       setCurrentCategory,
       currentEmailType,
-      setCurrentEmailType
+      setCurrentEmailType,
+      refreshTrigger,
+      triggerRefresh
     }}>
       {children}
     </AppContext.Provider>

@@ -83,9 +83,16 @@ class GmailService:
             return False
     
     def _create_credentials(self, oauth_token: OAuthToken) -> Credentials:
-        """Create Google credentials from OAuth token - now uses the working method"""
-        # Use the working credentials method for all operations
-        return self._create_credentials_simple(oauth_token)
+        """Create Google credentials from OAuth token (legacy method for backward compatibility)"""
+        credentials = Credentials(
+            token=oauth_token.access_token,
+            refresh_token=oauth_token.refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            scopes=oauth_token.scope.split() if oauth_token.scope else []
+        )
+        return credentials
     
     async def fetch_recent_emails(self, oauth_token: OAuthToken, user_email: str, limit: int = 50) -> List[Email]:
         """Fetch recent emails from user's Gmail inbox"""

@@ -44,6 +44,11 @@ class OAuthRepository(ABC):
         pass
     
     @abstractmethod
+    async def find_by_user_email(self, user_email: str) -> Optional[OAuthSession]:
+        """Find active OAuth session by user email"""
+        pass
+    
+    @abstractmethod
     async def deactivate_user_sessions(self, user_id: str) -> bool:
         """Deactivate all sessions for a user"""
         pass 

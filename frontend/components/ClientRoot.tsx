@@ -14,7 +14,7 @@ function ComposeModalRoot() {
 
 export default function ClientRoot({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isDashboardRoute = pathname?.startsWith("/dashboard") || pathname?.startsWith("/email");
+  const isDashboardRoute = pathname?.startsWith("/dashboard") || pathname?.startsWith("/email") || pathname?.startsWith("/drafts");
 
   return (
     <AppProvider>

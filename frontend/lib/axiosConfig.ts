@@ -15,25 +15,45 @@ const apiClient: AxiosInstance = axios.create({
 
 // Add a request interceptor to include sessionId if available
 apiClient.interceptors.request.use((config) => {
+  console.log('🔍 Axios interceptor: Processing request to', config.url);
+
   if (typeof window !== 'undefined') {
     const userStr = localStorage.getItem('user');
+    console.log('🔍 Axios interceptor: userStr from localStorage:', userStr);
+
     if (userStr) {
-      const user = JSON.parse(userStr);
-      console.log('User object from storage:', user);
-      // Accept both sessionId and session_id, but always use sessionId for header
-      const sessionId = user.sessionId || user.session_id;
-      if (sessionId) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${sessionId}`;
+      try {
+        const user = JSON.parse(userStr);
+        console.log('🔍 Axios interceptor: Parsed user object:', user);
+
+        // Accept both sessionId and session_id, but always use sessionId for header
+        const sessionId = user.sessionId || user.session_id;
+        console.log('🔍 Axios interceptor: Extracted sessionId:', sessionId);
+
+        if (sessionId) {
+          config.headers = config.headers || {};
+          config.headers['Authorization'] = `Bearer ${sessionId}`;
+          console.log('✅ Axios interceptor: Authorization header set');
+        } else {
+          console.log('❌ Axios interceptor: No sessionId found in user object');
+        }
+      } catch (parseError) {
+        console.error('❌ Axios interceptor: Failed to parse user object:', parseError);
       }
+    } else {
+      console.log('❌ Axios interceptor: No user found in localStorage');
     }
-  }
-  // Log the Authorization header for debugging
-  if (config.headers && config.headers['Authorization']) {
-    console.log('Authorization header:', config.headers['Authorization']);
   } else {
-    console.log('Authorization header not set');
+    console.log('❌ Axios interceptor: Window not available (SSR)');
   }
+
+  // Log the final Authorization header
+  if (config.headers && config.headers['Authorization']) {
+    console.log('✅ Final Authorization header:', config.headers['Authorization']);
+  } else {
+    console.log('❌ Final Authorization header not set');
+  }
+
   return config;
 });
 

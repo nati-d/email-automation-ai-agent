@@ -2,7 +2,8 @@ import React, { useState, useContext, createContext, ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { sendEmail, getEmailSuggestions } from "@/lib/api/email";
+import { sendEmail, getEmailSuggestions, createDraft, updateDraft, deleteDraft, type Draft } from "@/lib/api/email";
+import { useApp } from "@/components/AppContext";
 
 interface ComposeEmailProps {
   open: boolean;
@@ -15,6 +16,10 @@ interface EmailData {
   subject: string;
   body?: string;
   recipients?: string[];
+}
+
+interface DraftData extends Draft {
+  // Additional properties if needed
 }
 
 const initialState = {
@@ -31,31 +36,46 @@ interface ComposeModalContextType {
   openCompose: () => void;
   closeCompose: () => void;
   replyToEmail: (email: EmailData) => void;
+  editDraft: (draft: DraftData) => void;
   replyData: EmailData | null;
+  draftData: DraftData | null;
+  onDraftSaved?: () => void;
+  setOnDraftSaved: (callback: (() => void) | undefined) => void;
 }
 const ComposeModalContext = createContext<ComposeModalContextType | undefined>(undefined);
 
 export function ComposeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [replyData, setReplyData] = useState<EmailData | null>(null);
+  const [draftData, setDraftData] = useState<DraftData | null>(null);
+  const [onDraftSaved, setOnDraftSaved] = useState<(() => void) | undefined>(undefined);
   
   const openCompose = () => {
     setReplyData(null);
+    setDraftData(null);
     setOpen(true);
   };
   
   const closeCompose = () => {
     setOpen(false);
     setReplyData(null);
+    setDraftData(null);
   };
   
   const replyToEmail = (email: EmailData) => {
     setReplyData(email);
+    setDraftData(null);
+    setOpen(true);
+  };
+  
+  const editDraft = (draft: DraftData) => {
+    setDraftData(draft);
+    setReplyData(null);
     setOpen(true);
   };
   
   return (
-    <ComposeModalContext.Provider value={{ open, openCompose, closeCompose, replyToEmail, replyData }}>
+    <ComposeModalContext.Provider value={{ open, openCompose, closeCompose, replyToEmail, editDraft, replyData, draftData, onDraftSaved, setOnDraftSaved }}>
       {children}
     </ComposeModalContext.Provider>
   );
@@ -68,7 +88,8 @@ export function useComposeModal() {
 }
 
 const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
-  const { replyData } = useComposeModal();
+  const { replyData, draftData, onDraftSaved } = useComposeModal();
+  const { triggerRefresh } = useApp();
   const [to, setTo] = useState(initialState.to);
   const [subject, setSubject] = useState(initialState.subject);
   const [body, setBody] = useState(initialState.body);
@@ -80,6 +101,9 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState<string | null>(null);
   const [showSuggestion, setShowSuggestion] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(null);
+
 
   React.useEffect(() => {
     if (!open) {
@@ -91,6 +115,9 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
       setMinimized(false);
       setMaximized(false);
       setLoading(false);
+      setIsDraft(false);
+      setDraftId(null);
+      // Auto-save timer removed
     }
   }, [open]);
 
@@ -105,26 +132,124 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
       const replyPrefix = `\n\n--- Original Message ---\nFrom: ${replyData.sender}\nSubject: ${replyData.subject}\n\n`;
       const originalBody = replyData.body || '';
       setBody(replyPrefix + originalBody);
+      setIsDraft(false);
+      setDraftId(null);
     }
   }, [open, replyData]);
 
-  if (!open) return null;
+  // Handle draft data when modal opens
+  React.useEffect(() => {
+    if (open && draftData) {
+      console.log('📝 Opening draft for editing:', draftData.id, draftData.subject);
+      // Pre-fill the form for draft editing
+      setTo(draftData.recipients.join(', '));
+      setSubject(draftData.subject);
+      setBody(draftData.body);
+      setIsDraft(true);
+      setDraftId(draftData.id);
+    }
+  }, [open, draftData]);
+
+  // Manual save draft functionality only
+
+  const handleSaveDraft = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const recipients = to.split(',').map(email => email.trim()).filter(email => email);
+      if (recipients.length === 0) {
+        setError('Please enter at least one recipient');
+        return;
+      }
+
+      if (isDraft && draftId) {
+        // Update existing draft
+        await updateDraft(draftId, {
+          recipients,
+          subject: subject || 'No Subject',
+          body: body || ''
+        });
+        setSuccess('Draft updated successfully!');
+      } else {
+        // Create new draft
+        const draft = await createDraft({
+          recipients,
+          subject: subject || 'No Subject',
+          body: body || ''
+        });
+        setIsDraft(true);
+        setDraftId(draft.id);
+        setSuccess('Draft saved successfully!');
+      }
+      
+      // Call the callback to refresh drafts list
+      if (onDraftSaved) {
+        onDraftSaved();
+      }
+      
+      // Trigger global refresh for dashboard and other components
+      triggerRefresh();
+      
+      setTimeout(() => {
+        setSuccess(null);
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to save draft');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setSuccess(null);
     setError(null);
+    
+    const currentDraftId = draftId; // Store current draft ID before reset
+    const wasDraft = isDraft; // Store draft status before reset
+    
     try {
+      const recipients = to.split(',').map(email => email.trim()).filter(email => email);
+      
+      // Send the email using the existing working sendEmail function
       await sendEmail({
         body,
-        recipients: [to],
-        subject,
+        recipients,
+        subject: subject || 'No Subject',
       });
-      setSuccess("Email sent successfully!");
+      
+      // If this was a draft being sent, delete it from the database
+      if (wasDraft && currentDraftId) {
+        try {
+          console.log('🗑️ Deleting sent draft from database:', currentDraftId);
+          await deleteDraft(currentDraftId, false); // Don't sync with Gmail since it's local only
+          console.log('✅ Draft deleted from database after sending');
+          
+          // Call the callback to refresh drafts list
+          if (onDraftSaved) {
+            onDraftSaved();
+          }
+          
+          // Trigger global refresh for dashboard and other components
+          triggerRefresh();
+        } catch (deleteError: any) {
+          console.warn('⚠️ Failed to delete draft from database:', deleteError);
+          // Don't fail the send operation if draft deletion fails
+        }
+      }
+      
+      setSuccess(wasDraft ? "Draft sent successfully and removed from drafts!" : "Email sent successfully!");
+      
+      // Reset form
       setTo(initialState.to);
       setSubject(initialState.subject);
       setBody(initialState.body);
+      setIsDraft(false);
+      setDraftId(null);
+      
       setTimeout(() => {
         setSuccess(null);
         onClose();
@@ -166,6 +291,9 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
     }
   };
 
+  // Early return after all hooks
+  if (!open) return null;
+
   // Modal styles
   const baseStyle =
     "fixed z-50 flex flex-col transition-all border shadow-xl rounded-xl";
@@ -205,13 +333,22 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
           borderColor: "var(--modal-border, var(--sidebar-border, #e5e7eb))",
         }}
       >
-        <span className="font-semibold tracking-wide">Compose</span>
+        <div className="flex items-center gap-2">
+          <span className="font-semibold tracking-wide">
+            {isDraft ? '✏️ Edit Draft' : replyData ? '↩️ Reply' : '✉️ Compose'}
+          </span>
+          {isDraft && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+              Draft
+            </span>
+          )}
+        </div>
         <div className="flex gap-1">
           <Button
             variant="ghost"
             size="icon"
             title="Minimize"
-            className="text-base"
+            className="text-base hover:bg-white/20"
             onClick={(e) => {
               e.stopPropagation();
               handleMinimize();
@@ -225,8 +362,8 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
           <Button
             variant="ghost"
             size="icon"
-            title="Maximize"
-            className="text-base"
+            title={maximized ? "Restore" : "Maximize"}
+            className="text-base hover:bg-white/20"
             onClick={(e) => {
               e.stopPropagation();
               handleMaximize();
@@ -235,13 +372,13 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
             type="button"
             disabled={loading}
           >
-            {maximized ? <>&#9633;</> : <>&#9723;</>}
+            {maximized ? <>⧉</> : <>⛶</>}
           </Button>
           <Button
             variant="ghost"
             size="icon"
             title="Close"
-            className="text-base text-red-600 hover:text-red-700"
+            className="text-base hover:bg-red-500/20 hover:text-red-300"
             onClick={(e) => {
               e.stopPropagation();
               onClose();
@@ -249,18 +386,27 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
             type="button"
             disabled={loading}
           >
-            &times;
+            ✕
           </Button>
         </div>
       </div>
       {/* Minimized view */}
       {minimized ? (
-        <div className="flex-1 flex items-center justify-between w-full h-full px-2">
-          <span className="text-gray-600 dark:text-gray-300">Compose</span>
+        <div className="flex-1 flex items-center justify-between w-full h-full px-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {isDraft ? '✏️ Draft' : replyData ? '↩️ Reply' : '✉️ Compose'}
+            </span>
+            {subject && (
+              <span className="text-xs text-gray-500 truncate max-w-32">
+                {subject}
+              </span>
+            )}
+          </div>
           <Button
             variant="ghost"
-            size="icon"
-            className="text-base"
+            size="sm"
+            className="text-xs px-2 py-1 h-6"
             onClick={(e) => {
               e.stopPropagation();
               setMinimized(false);
@@ -268,7 +414,7 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
             type="button"
             disabled={loading}
           >
-            &#9633;
+            Restore
           </Button>
         </div>
       ) : (
@@ -298,22 +444,35 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
             className="flex-1 min-h-[8rem] resize-none"
             disabled={loading}
           />
-          {error && <div className="text-red-600 text-sm mt-1">{error}</div>}
-          {success && <div className="text-green-600 text-sm mt-1">{success}</div>}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
+              <span>✅</span>
+              <span>{success}</span>
+            </div>
+          )}
           {showSuggestion && suggestion && (
-            <div className="border rounded-lg p-3 bg-gray-50 dark:bg-gray-800">
-              <div className="text-sm font-medium mb-2">AI Suggestion:</div>
-              <div className="text-sm text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap">
+            <div className="border rounded-lg p-3 bg-blue-50 dark:bg-blue-900/20 border-blue-200">
+              <div className="text-sm font-medium mb-2 flex items-center gap-2">
+                <span>✨</span>
+                <span>AI Suggestion</span>
+              </div>
+              <div className="text-sm text-gray-700 dark:text-gray-300 mb-3 whitespace-pre-wrap max-h-32 overflow-y-auto">
                 {suggestion}
               </div>
               <div className="flex gap-2">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   onClick={handleApplySuggestion}
                 >
-                  Apply Suggestion
+                  ✓ Use This
                 </Button>
                 <Button
                   type="button"
@@ -321,35 +480,41 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
                   size="sm"
                   onClick={() => setShowSuggestion(false)}
                 >
-                  Close
+                  ✕ Close
                 </Button>
               </div>
             </div>
           )}
-          <div className="flex gap-2 justify-end mt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleGetSuggestions}
-              disabled={loading || suggestionsLoading}
-            >
-              {suggestionsLoading ? "Getting Suggestions..." : "Get Suggestions"}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onClose}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="default"
-              disabled={loading}
-            >
-              {loading ? "Sending..." : "Send"}
-            </Button>
+          <div className="flex gap-2 justify-between mt-2">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGetSuggestions}
+                disabled={loading || suggestionsLoading}
+                size="sm"
+              >
+                {suggestionsLoading ? "✨ Getting..." : "✨ AI Help"}
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleSaveDraft}
+                disabled={loading}
+                size="sm"
+              >
+                💾 {isDraft ? "Update" : "Save"}
+              </Button>
+              <Button
+                type="submit"
+                variant="default"
+                disabled={loading}
+              >
+                {loading ? "Sending..." : isDraft ? "📤 Send Draft" : "📤 Send"}
+              </Button>
+            </div>
           </div>
         </form>
       )}

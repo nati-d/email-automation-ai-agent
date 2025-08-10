@@ -4,13 +4,19 @@ export interface Category {
   id: string;
   entity_name: string;
   name?: string;
+  description?: string;
   color?: string;
   count?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
   [key: string]: any;
 }
 
 export interface CreateCategoryData {
   name: string;
+  description?: string;
+  color?: string;
 }
 
 export async function fetchCategories(): Promise<Category[]> {

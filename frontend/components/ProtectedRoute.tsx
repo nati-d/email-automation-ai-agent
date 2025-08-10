@@ -14,9 +14,11 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     const checkAuth = () => {
+      console.log('🔍 ProtectedRoute: checkAuth called');
       try {
         const userStr = localStorage.getItem("user");
         if (!userStr) {
+          console.log('❌ ProtectedRoute: No user in localStorage, redirecting to /');
           router.replace("/");
           return;
         }
@@ -25,14 +27,16 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         const sessionId = user.sessionId || user.session_id;
 
         if (!sessionId) {
+          console.log('❌ ProtectedRoute: No sessionId found, redirecting to /');
           localStorage.removeItem("user");
           router.replace("/");
           return;
         }
 
+        console.log('✅ ProtectedRoute: Authentication successful');
         setIsAuthenticated(true);
       } catch (error) {
-        console.error("Auth check error:", error);
+        console.error("❌ ProtectedRoute: Auth check error:", error);
         localStorage.removeItem("user");
         router.replace("/");
       } finally {
