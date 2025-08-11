@@ -26,7 +26,7 @@ export default function DraftsPage() {
     console.log('🔍 DraftsPage useEffect triggered, user:', user);
     if (user) {
       // Load drafts on first load (no auto-sync)
-      loadDrafts(false)
+      loadDrafts()
     }
   }, [user])
 

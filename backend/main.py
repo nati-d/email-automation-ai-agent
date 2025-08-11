@@ -26,6 +26,7 @@ from app.presentation.api.category_controller import router as category_router
 from app.presentation.api.user_account_controller import router as user_account_router
 from app.presentation.api.llm_controller import router as llm_router
 from app.presentation.api.draft_controller import router as draft_router
+from app.presentation.api.waitlist_controller import router as waitlist_router
 
 
 @asynccontextmanager
@@ -158,6 +159,7 @@ app.include_router(category_router, prefix=settings.api_prefix, tags=["categorie
 app.include_router(user_account_router, prefix=settings.api_prefix, tags=["user-accounts"])
 app.include_router(llm_router, prefix=settings.api_prefix, tags=["LLM"])
 app.include_router(draft_router, prefix=settings.api_prefix, tags=["drafts"])
+app.include_router(waitlist_router, prefix=settings.api_prefix, tags=["waitlist"])
 
 
 @app.get("/", 

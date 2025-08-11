@@ -20,6 +20,7 @@ from ..repositories.firestore_oauth_repository import FirestoreOAuthRepository
 from ..repositories.firestore_category_repository import FirestoreCategoryRepository
 from ..repositories.firestore_user_account_repository import FirestoreUserAccountRepository
 from ..repositories.firestore_user_profile_repository import FirestoreUserProfileRepository
+from ..repositories.firestore_waitlist_repository import FirestoreWaitlistRepository
 
 # Domain
 from ...domain.repositories.email_repository import EmailRepository
@@ -28,6 +29,7 @@ from ...domain.repositories.oauth_repository import OAuthRepository
 from ...domain.repositories.category_repository import CategoryRepository
 from ...domain.repositories.user_account_repository import UserAccountRepository
 from ...domain.repositories.user_profile_repository import UserProfileRepository
+from ...domain.repositories.waitlist_repository import WaitlistRepository
 
 # Application
 from ...application.use_cases.email_use_cases import (
@@ -84,6 +86,7 @@ class Container:
         self._category_repository: Optional[CategoryRepository] = None
         self._user_account_repository: Optional[UserAccountRepository] = None
         self._user_profile_repository: Optional[UserProfileRepository] = None
+        self._waitlist_repository: Optional[WaitlistRepository] = None
         
         # Email use cases
         self._create_email_use_case: Optional[CreateEmailUseCase] = None
@@ -260,6 +263,14 @@ class Container:
             db = firebase.get_firestore_client()
             self._user_profile_repository = FirestoreUserProfileRepository(db)
         return self._user_profile_repository
+    
+    def waitlist_repository(self) -> WaitlistRepository:
+        """Get waitlist repository"""
+        if self._waitlist_repository is None:
+            firebase = self.firebase_service()
+            db = firebase.get_firestore_client()
+            self._waitlist_repository = FirestoreWaitlistRepository(db)
+        return self._waitlist_repository
     
     # Email Use Cases
     def create_email_use_case(self) -> CreateEmailUseCase:
