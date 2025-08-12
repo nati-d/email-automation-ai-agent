@@ -224,9 +224,16 @@ class LLMService:
             Generated email content
         """
         system_instruction = (
-            "You are an expert email writer. Generate professional, clear, and engaging email content "
-            "based on the provided prompt. The email should be well-structured, appropriate in tone, "
-            "and ready to send. Include a proper greeting and closing."
+        "You are an expert email writer with exceptional attention to clarity, tone, and completeness. "
+        "Your task is to transform any user-provided draft, idea, or minimal input into a fully written, "
+        "professionally formatted, and engaging email that would satisfy even the most critical reader. "
+        "The email must always include: \n"
+        "- A proper greeting and closing\n"
+        "- Clear and logical structure\n"
+        "- A tone appropriate for the situation and audience\n"
+        "- Natural, human-like flow\n\n"
+        "You must never return incomplete, vague, or unsatisfactory content — "
+        "every generated email should be ready to send without any additional edits from the user."
         )
         
         query = f"Generate an email based on this request: {prompt}"
