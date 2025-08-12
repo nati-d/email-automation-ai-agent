@@ -225,7 +225,7 @@ export function AppSidebar() {
           color: 'var(--sidebar-foreground)',
           borderColor: 'var(--sidebar-border)',
         }}
-        collapsible="icon"
+        collapsible="offcanvas"
       >
         <SidebarHeader className="p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 w-full min-w-0 max-w-full overflow-x-hidden">
           <div className="flex items-center gap-2">
@@ -425,14 +425,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="start" className="w-[--radix-popper-anchor-width]">
-                  <DropdownMenuItem onClick={handleAddAccount} disabled={addAccountLoading}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span>{addAccountLoading ? 'Redirecting...' : 'Add Account'}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <HelpCircle className="mr-2 h-4 w-4" />
-                    <span>Help</span>
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>

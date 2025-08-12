@@ -7,6 +7,8 @@ Email sending service implementation.
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import List, Optional
 
 from ..config.settings import Settings
@@ -24,7 +26,8 @@ class EmailService:
         recipients: List[str],
         subject: str,
         body: str,
-        html_body: Optional[str] = None
+        html_body: Optional[str] = None,
+        attachments: Optional[List[dict]] = None
     ) -> bool:
         """Send email via SMTP"""
         print(f"🔍 DEBUG: EmailService.send_email() called")
@@ -38,24 +41,53 @@ class EmailService:
         try:
             print(f"🔍 DEBUG: Step 1 - Creating email message")
             # Create message
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = subject
-            msg['From'] = sender
-            msg['To'] = ', '.join(recipients)
-            
-            print(f"🔍 DEBUG: Step 2 - Adding text part")
-            # Add text part
-            text_part = MIMEText(body, 'plain')
-            msg.attach(text_part)
-            
-            print(f"🔍 DEBUG: Step 3 - Adding HTML part if provided")
-            # Add HTML part if provided
-            if html_body:
-                html_part = MIMEText(html_body, 'html')
-                msg.attach(html_part)
-                print(f"   ✅ HTML part attached")
+            has_attachments = bool(attachments)
+            if has_attachments:
+                msg = MIMEMultipart('mixed')
+                msg['Subject'] = subject
+                msg['From'] = sender
+                msg['To'] = ', '.join(recipients)
+
+                # Inner alternative part
+                alt = MIMEMultipart('alternative')
+                alt.attach(MIMEText(body, 'plain'))
+                if html_body:
+                    alt.attach(MIMEText(html_body, 'html'))
+                msg.attach(alt)
+
+                # Attach files
+                for att in attachments or []:
+                    try:
+                        filename = att.get('filename') or 'attachment'
+                        content_type = att.get('content_type') or 'application/octet-stream'
+                        data = att.get('data') or b''
+                        main_type, _, sub_type = (content_type + '/octet-stream').partition('/')
+                        part = MIMEBase(main_type, sub_type)
+                        part.set_payload(data)
+                        encoders.encode_base64(part)
+                        part.add_header('Content-Disposition', 'attachment', filename=filename)
+                        msg.attach(part)
+                    except Exception as e:
+                        print(f"⚠️ Failed to attach file {att}: {e}")
             else:
-                print(f"   ℹ️ No HTML part provided")
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = subject
+                msg['From'] = sender
+                msg['To'] = ', '.join(recipients)
+
+                print(f"🔍 DEBUG: Step 2 - Adding text part")
+                # Add text part
+                text_part = MIMEText(body, 'plain')
+                msg.attach(text_part)
+
+                print(f"🔍 DEBUG: Step 3 - Adding HTML part if provided")
+                # Add HTML part if provided
+                if html_body:
+                    html_part = MIMEText(html_body, 'html')
+                    msg.attach(html_part)
+                    print(f"   ✅ HTML part attached")
+                else:
+                    print(f"   ℹ️ No HTML part provided")
             
             print(f"🔍 DEBUG: Step 4 - Checking SMTP configuration")
             # Check if SMTP is configured

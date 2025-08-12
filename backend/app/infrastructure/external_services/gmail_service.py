@@ -436,7 +436,8 @@ class GmailService:
         recipients: List[str], 
         subject: str, 
         body: str, 
-        html_body: Optional[str] = None
+        html_body: Optional[str] = None,
+        attachments: Optional[List[dict]] = None
     ) -> bool:
         """Send email through Gmail API on behalf of the user"""
         try:
@@ -446,6 +447,7 @@ class GmailService:
             print(f"   - subject: {subject}")
             print(f"   - body length: {len(body)} chars")
             print(f"   - html_body: {'provided' if html_body else 'None'}")
+            print(f"   - attachments: {len(attachments) if attachments else 0}")
             print(f"   - oauth_token.access_token: {oauth_token.access_token[:20] if oauth_token.access_token else 'None'}...")
             
             # Create Gmail service with simple credentials
@@ -459,7 +461,7 @@ class GmailService:
             
             # Create email message
             print("🔄 Creating email message...")
-            message = self._create_email_message(sender_email, recipients, subject, body, html_body)
+            message = self._create_email_message(sender_email, recipients, subject, body, html_body, attachments)
             print("✅ Email message created")
             
             # Send email through Gmail API
@@ -487,31 +489,56 @@ class GmailService:
         recipients: List[str], 
         subject: str, 
         body: str, 
-        html_body: Optional[str] = None
+        html_body: Optional[str] = None,
+        attachments: Optional[List[dict]] = None
     ) -> str:
         """Create email message in Gmail API format"""
         try:
-            # Create message
-            if html_body:
-                # Create multipart message with both text and HTML
-                msg = MIMEMultipart('alternative')
-                msg['Subject'] = subject
-                msg['From'] = sender_email
-                msg['To'] = ', '.join(recipients)
-                
-                # Add text part
-                text_part = MIMEText(body, 'plain', 'utf-8')
-                msg.attach(text_part)
-                
-                # Add HTML part
-                html_part = MIMEText(html_body, 'html', 'utf-8')
-                msg.attach(html_part)
+            has_attachments = bool(attachments)
+            if has_attachments:
+                outer = MIMEMultipart('mixed')
+                outer['Subject'] = subject
+                outer['From'] = sender_email
+                outer['To'] = ', '.join(recipients)
+
+                # Create inner alternative part for text and html
+                alt = MIMEMultipart('alternative')
+                alt.attach(MIMEText(body or "", 'plain', 'utf-8'))
+                if html_body:
+                    alt.attach(MIMEText(html_body, 'html', 'utf-8'))
+                outer.attach(alt)
+
+                # Attach files
+                from email.mime.base import MIMEBase
+                from email import encoders
+                for att in attachments or []:
+                    try:
+                        filename = att.get('filename') or 'attachment'
+                        content_type = att.get('content_type') or 'application/octet-stream'
+                        data = att.get('data') or b''
+
+                        main_type, _, sub_type = (content_type + '/octet-stream').partition('/')
+                        part = MIMEBase(main_type, sub_type)
+                        part.set_payload(data)
+                        encoders.encode_base64(part)
+                        part.add_header('Content-Disposition', 'attachment', filename=filename)
+                        outer.attach(part)
+                    except Exception as e:
+                        print(f"⚠️ Failed to attach file {att}: {e}")
+                msg = outer
             else:
-                # Create simple text message
-                msg = MIMEText(body, 'plain', 'utf-8')
-                msg['Subject'] = subject
-                msg['From'] = sender_email
-                msg['To'] = ', '.join(recipients)
+                if html_body:
+                    msg = MIMEMultipart('alternative')
+                    msg['Subject'] = subject
+                    msg['From'] = sender_email
+                    msg['To'] = ', '.join(recipients)
+                    msg.attach(MIMEText(body or "", 'plain', 'utf-8'))
+                    msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+                else:
+                    msg = MIMEText(body or "", 'plain', 'utf-8')
+                    msg['Subject'] = subject
+                    msg['From'] = sender_email
+                    msg['To'] = ', '.join(recipients)
             
             # Encode message
             raw_message = base64.urlsafe_b64encode(msg.as_bytes()).decode('utf-8')

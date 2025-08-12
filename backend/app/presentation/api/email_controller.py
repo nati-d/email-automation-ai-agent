@@ -4,8 +4,8 @@ Email Controller
 API endpoints for email operations with clean architecture.
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional, Union
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form, Request
 
 from ...application.dto.email_dto import EmailDTO, CreateEmailDTO, UpdateEmailDTO
 from ...application.dto.user_dto import UserDTO
@@ -513,39 +513,147 @@ async def delete_email(
     description="""
     Send a new email to one or more recipients.
     
-    **Required fields:**
+    Supports both JSON and multipart/form-data requests.
+    
+    JSON body:
     - `recipients`: List of recipient email addresses
     - `subject`: Email subject
     - `body`: Email body text (plain text)
+    - `html_body` (optional)
     
-    No other fields are accepted. This endpoint is designed for simple, direct email sending.
-    
-    **Example:**
-    ```json
-    {
-      "recipients": ["user@example.com"],
-      "subject": "Hello!",
-      "body": "This is a test email."
-    }
-    ```
+    multipart/form-data fields:
+    - `recipients`: JSON-encoded list of recipient emails (e.g. ["a@ex.com"]) or comma-separated string
+    - `subject`
+    - `body`
+    - `html_body` (optional)
+    - `attachments`: one or more files
     """,
     response_description="Result of the send email operation",
     tags=["emails", "send"]
 )
 async def send_email(
-    request: SendEmailRequest,
+    request: Request,
+    # Form fields (will be None for JSON requests)
+    recipients: Optional[str] = Form(None),
+    subject: Optional[str] = Form(None),
+    body: Optional[str] = Form(None),
+    html_body: Optional[str] = Form(None),
+    attachments: Optional[Union[UploadFile, List[UploadFile]]] = File(None),
     current_user: UserDTO = Depends(get_current_user)
 ) -> SendEmailResponse:
-    """
-    Send a new email to one or more recipients. Only recipients, subject, and body are accepted.
-    """
+    """Send a new email to one or more recipients. Accepts JSON or multipart/form-data with attachments."""
     container = get_container()
     use_case = container.send_new_email_use_case()
+
+    content_type = request.headers.get("content-type", "").lower()
+
+    recipients_list: List[str]
+    subject_value: str
+    body_value: str
+    html_body_value: Optional[str] = None
+    attachment_payloads: List[dict] = []
+
+    if content_type.startswith("multipart/form-data"):
+        # Parse recipients
+        recipients_raw = (recipients or "").strip()
+        if not recipients_raw:
+            # Fallback: parse from request.form() if not bound
+            try:
+                form = await request.form()
+                # Try various common shapes
+                recipients_raw = (form.get("recipients") or form.get("recipients[]") or "").strip()
+                if not subject:
+                    subject = form.get("subject")
+                if not body:
+                    body = form.get("body")
+                if not html_body:
+                    html_body = form.get("html_body")
+                # Attachments fallback
+                if attachments is None:
+                    files = form.getlist("attachments") if hasattr(form, 'getlist') else []
+                    attachments = files  # type: ignore
+            except Exception:
+                recipients_raw = ""
+        if recipients_raw.startswith("["):
+            # JSON encoded array
+            import json
+            try:
+                recipients_list = json.loads(recipients_raw)
+            except Exception:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid recipients JSON")
+        else:
+            # comma or space separated
+            recipients_list = [e.strip() for e in recipients_raw.replace(";", ",").replace("\n", ",").replace(" ", ",").split(",") if e.strip()]
+
+        # If still empty, try getting as a list from the form (recipients[])
+        if not recipients_list and 'form' in locals():
+            try:
+                lst = form.getlist('recipients') if hasattr(form, 'getlist') else []  # type: ignore[name-defined]
+                if lst:
+                    recipients_list = [str(x).strip() for x in lst if str(x).strip()]
+            except Exception:
+                pass
+
+        subject_value = subject or ""
+        body_value = body or ""
+        html_body_value = html_body
+
+        # Normalize attachments to a list
+        files_list: List[UploadFile] = []
+        if isinstance(attachments, list):
+            files_list = attachments
+        elif attachments is not None:
+            files_list = [attachments]
+
+        # Attachments
+        if files_list:
+            for f in files_list:
+                try:
+                    content = await f.read()
+                finally:
+                    await f.close()
+                attachment_payloads.append({
+                    "filename": f.filename or "attachment",
+                    "content_type": f.content_type or "application/octet-stream",
+                    "data": content,
+                })
+    else:
+        # JSON body
+        try:
+            body_json = await request.json()
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid request body")
+
+        # Validate with Pydantic model
+        # Allow recipients to be provided as a JSON string as well
+        if isinstance(body_json.get("recipients"), str):
+            import json as _json
+            try:
+                body_json["recipients"] = _json.loads(body_json["recipients"])  # type: ignore
+            except Exception:
+                # Leave as-is; Pydantic will raise a proper validation error
+                pass
+
+        req = SendEmailRequest(**body_json)
+        recipients_list = [str(r) for r in req.recipients]
+        subject_value = req.subject
+        body_value = req.body
+        html_body_value = None
+
+    if not recipients_list:
+        print(f"❌ send_email validation: empty recipients. Parsed content_type={content_type}, subject={subject_value!r}, body_len={len(body_value or '')}")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="At least one recipient is required")
+    if not subject_value or not body_value:
+        print(f"❌ send_email validation: missing subject/body. subject={subject_value!r}, body_len={len(body_value or '')}")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Subject and body are required")
+
     result = await use_case.execute(
-        subject=request.subject,
-        body=request.body,
-        recipients=request.recipients,
-        sender_email=current_user.email
+        subject=subject_value,
+        body=body_value,
+        recipients=recipients_list,
+        sender_email=current_user.email,
+        html_body=html_body_value,
+        attachments=attachment_payloads or None,
     )
     return SendEmailResponse(
         success=True,

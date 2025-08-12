@@ -185,7 +185,7 @@ class SendNewEmailUseCase(EmailUseCaseBase):
         self.gmail_service = gmail_service
         self.oauth_repository = oauth_repository
     
-    async def execute(self, sender_email: str, recipients: List[str], subject: str, body: str, html_body: Optional[str] = None) -> EmailDTO:
+    async def execute(self, sender_email: str, recipients: List[str], subject: str, body: str, html_body: Optional[str] = None, attachments: Optional[List[dict]] = None) -> EmailDTO:
         """Create and send a new email"""
         
         # Create email entity
@@ -218,6 +218,7 @@ class SendNewEmailUseCase(EmailUseCaseBase):
             print(f"      subject: {subject}")
             print(f"      body length: {len(body)} chars")
             print(f"      html_body: {'provided' if html_body else 'None'}")
+            print(f"      attachments: {len(attachments) if attachments else 0}")
             
             # Try Gmail API first (preferred for sending on behalf of user)
             if self.gmail_service and self.oauth_repository:
@@ -252,7 +253,8 @@ class SendNewEmailUseCase(EmailUseCaseBase):
                             recipients=recipients,
                             subject=subject,
                             body=body,
-                            html_body=html_body
+                            html_body=html_body,
+                            attachments=attachments
                         )
                         
                         if success:
@@ -274,7 +276,8 @@ class SendNewEmailUseCase(EmailUseCaseBase):
                             recipients=recipients,
                             subject=subject,
                             body=body,
-                            html_body=html_body
+                            html_body=html_body,
+                            attachments=attachments
                         )
                         
                         if not success:
@@ -296,7 +299,8 @@ class SendNewEmailUseCase(EmailUseCaseBase):
                     recipients=recipients,
                     subject=subject,
                     body=body,
-                    html_body=html_body
+                    html_body=html_body,
+                    attachments=attachments
                 )
                 
                 if not success:
@@ -313,6 +317,13 @@ class SendNewEmailUseCase(EmailUseCaseBase):
             # Mark as sent
             saved_email.mark_as_sent()
             updated_email = await self.email_repository.update(saved_email)
+            # Also persist a copy into the dedicated 'sent_email' collection for fast retrieval in Sent
+            try:
+                saved_email.set_email_type(EmailType.SENT)
+                await self.email_repository.save(saved_email)
+                print("✅ Saved email to 'sent_email' collection for Sent view")
+            except Exception as e:
+                print(f"⚠️ Failed to save email to 'sent_email' collection: {e}")
             return self._entity_to_dto(updated_email)
         
         except DomainValidationError:

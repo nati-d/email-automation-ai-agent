@@ -2,7 +2,15 @@ import React, { useState, useContext, createContext, ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { sendEmail, getEmailSuggestions, createDraft, updateDraft, deleteDraft, type Draft } from "@/lib/api/email";
+import {
+  sendEmail,
+  getEmailSuggestions,
+  createDraft,
+  updateDraft,
+  deleteDraft,
+  type Draft,
+} from "@/lib/api/email";
+import AttachmentUpload from "@/components/email/AttachmentUpload";
 import { useApp } from "@/components/AppContext";
 
 interface ComposeEmailProps {
@@ -42,40 +50,56 @@ interface ComposeModalContextType {
   onDraftSaved?: () => void;
   setOnDraftSaved: (callback: (() => void) | undefined) => void;
 }
-const ComposeModalContext = createContext<ComposeModalContextType | undefined>(undefined);
+const ComposeModalContext = createContext<ComposeModalContextType | undefined>(
+  undefined
+);
 
 export function ComposeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [replyData, setReplyData] = useState<EmailData | null>(null);
   const [draftData, setDraftData] = useState<DraftData | null>(null);
-  const [onDraftSaved, setOnDraftSaved] = useState<(() => void) | undefined>(undefined);
-  
+  const [onDraftSaved, setOnDraftSaved] = useState<(() => void) | undefined>(
+    undefined
+  );
+
   const openCompose = () => {
     setReplyData(null);
     setDraftData(null);
     setOpen(true);
   };
-  
+
   const closeCompose = () => {
     setOpen(false);
     setReplyData(null);
     setDraftData(null);
   };
-  
+
   const replyToEmail = (email: EmailData) => {
     setReplyData(email);
     setDraftData(null);
     setOpen(true);
   };
-  
+
   const editDraft = (draft: DraftData) => {
     setDraftData(draft);
     setReplyData(null);
     setOpen(true);
   };
-  
+
   return (
-    <ComposeModalContext.Provider value={{ open, openCompose, closeCompose, replyToEmail, editDraft, replyData, draftData, onDraftSaved, setOnDraftSaved }}>
+    <ComposeModalContext.Provider
+      value={{
+        open,
+        openCompose,
+        closeCompose,
+        replyToEmail,
+        editDraft,
+        replyData,
+        draftData,
+        onDraftSaved,
+        setOnDraftSaved,
+      }}
+    >
       {children}
     </ComposeModalContext.Provider>
   );
@@ -83,7 +107,8 @@ export function ComposeModalProvider({ children }: { children: ReactNode }) {
 
 export function useComposeModal() {
   const ctx = useContext(ComposeModalContext);
-  if (!ctx) throw new Error("useComposeModal must be used within ComposeModalProvider");
+  if (!ctx)
+    throw new Error("useComposeModal must be used within ComposeModalProvider");
   return ctx;
 }
 
@@ -103,13 +128,14 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   const [showSuggestion, setShowSuggestion] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
   const [draftId, setDraftId] = useState<string | null>(null);
-
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   React.useEffect(() => {
     if (!open) {
       setTo(initialState.to);
       setSubject(initialState.subject);
       setBody(initialState.body);
+      setAttachments([]);
       setSuccess(null);
       setError(null);
       setMinimized(false);
@@ -126,11 +152,15 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
     if (open && replyData) {
       // Pre-fill the form for reply
       setTo(replyData.sender);
-      setSubject(replyData.subject.startsWith('Re:') ? replyData.subject : `Re: ${replyData.subject}`);
-      
+      setSubject(
+        replyData.subject.startsWith("Re:")
+          ? replyData.subject
+          : `Re: ${replyData.subject}`
+      );
+
       // Add reply prefix to body
       const replyPrefix = `\n\n--- Original Message ---\nFrom: ${replyData.sender}\nSubject: ${replyData.subject}\n\n`;
-      const originalBody = replyData.body || '';
+      const originalBody = replyData.body || "";
       setBody(replyPrefix + originalBody);
       setIsDraft(false);
       setDraftId(null);
@@ -140,13 +170,18 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   // Handle draft data when modal opens
   React.useEffect(() => {
     if (open && draftData) {
-      console.log('📝 Opening draft for editing:', draftData.id, draftData.subject);
+      console.log(
+        "📝 Opening draft for editing:",
+        draftData.id,
+        draftData.subject
+      );
       // Pre-fill the form for draft editing
-      setTo(draftData.recipients.join(', '));
+      setTo(draftData.recipients.join(", "));
       setSubject(draftData.subject);
       setBody(draftData.body);
       setIsDraft(true);
       setDraftId(draftData.id);
+      setAttachments([]);
     }
   }, [open, draftData]);
 
@@ -156,9 +191,12 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
     setLoading(true);
     setError(null);
     try {
-      const recipients = to.split(',').map(email => email.trim()).filter(email => email);
+      const recipients = to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email);
       if (recipients.length === 0) {
-        setError('Please enter at least one recipient');
+        setError("Please enter at least one recipient");
         return;
       }
 
@@ -166,90 +204,96 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
         // Update existing draft
         await updateDraft(draftId, {
           recipients,
-          subject: subject || 'No Subject',
-          body: body || ''
+          subject: subject || "No Subject",
+          body: body || "",
         });
-        setSuccess('Draft updated successfully!');
+        setSuccess("Draft updated successfully!");
       } else {
         // Create new draft
         const draft = await createDraft({
           recipients,
-          subject: subject || 'No Subject',
-          body: body || ''
+          subject: subject || "No Subject",
+          body: body || "",
         });
         setIsDraft(true);
         setDraftId(draft.id);
-        setSuccess('Draft saved successfully!');
+        setSuccess("Draft saved successfully!");
       }
-      
+
       // Call the callback to refresh drafts list
       if (onDraftSaved) {
         onDraftSaved();
       }
-      
+
       // Trigger global refresh for dashboard and other components
       triggerRefresh();
-      
+
       setTimeout(() => {
         setSuccess(null);
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Failed to save draft');
+      setError(err.message || "Failed to save draft");
     } finally {
       setLoading(false);
     }
   };
-
-
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setSuccess(null);
     setError(null);
-    
+
     const currentDraftId = draftId; // Store current draft ID before reset
     const wasDraft = isDraft; // Store draft status before reset
-    
+
     try {
-      const recipients = to.split(',').map(email => email.trim()).filter(email => email);
-      
+      const recipients = to
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email);
+
       // Send the email using the existing working sendEmail function
       await sendEmail({
         body,
         recipients,
-        subject: subject || 'No Subject',
+        subject: subject || "No Subject",
+        attachments: attachments.length ? attachments : undefined,
       });
-      
+
       // If this was a draft being sent, delete it from the database
       if (wasDraft && currentDraftId) {
         try {
-          console.log('🗑️ Deleting sent draft from database:', currentDraftId);
+          console.log("🗑️ Deleting sent draft from database:", currentDraftId);
           await deleteDraft(currentDraftId, false); // Don't sync with Gmail since it's local only
-          console.log('✅ Draft deleted from database after sending');
-          
+          console.log("✅ Draft deleted from database after sending");
+
           // Call the callback to refresh drafts list
           if (onDraftSaved) {
             onDraftSaved();
           }
-          
+
           // Trigger global refresh for dashboard and other components
           triggerRefresh();
         } catch (deleteError: any) {
-          console.warn('⚠️ Failed to delete draft from database:', deleteError);
+          console.warn("⚠️ Failed to delete draft from database:", deleteError);
           // Don't fail the send operation if draft deletion fails
         }
       }
-      
-      setSuccess(wasDraft ? "Draft sent successfully and removed from drafts!" : "Email sent successfully!");
-      
+
+      setSuccess(
+        wasDraft
+          ? "Draft sent successfully and removed from drafts!"
+          : "Email sent successfully!"
+      );
+
       // Reset form
       setTo(initialState.to);
       setSubject(initialState.subject);
       setBody(initialState.body);
       setIsDraft(false);
       setDraftId(null);
-      
+
       setTimeout(() => {
         setSuccess(null);
         onClose();
@@ -299,21 +343,15 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
     "fixed z-50 flex flex-col transition-all border shadow-xl rounded-xl";
   const minimizedStyle =
     "bottom-4 right-4 w-80 h-12 cursor-pointer flex-row items-center justify-between px-4 py-2";
-  const maximizedStyle =
-    "top-4 left-1/2 -translate-x-1/2 w-[95vw] h-[90vh]";
-  const normalStyle =
-    "bottom-4 right-4 w-[28rem] max-w-[95vw] h-[32rem]";
+  const maximizedStyle = "top-4 left-1/2 -translate-x-1/2 w-[95vw] h-[90vh]";
+  const normalStyle = "bottom-4 right-4 w-[28rem] max-w-[95vw] h-[32rem]";
 
   return (
     <div
       className={
         baseStyle +
         " " +
-        (minimized
-          ? minimizedStyle
-          : maximized
-          ? maximizedStyle
-          : normalStyle)
+        (minimized ? minimizedStyle : maximized ? maximizedStyle : normalStyle)
       }
       style={{
         background: "var(--background)",
@@ -335,7 +373,7 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
       >
         <div className="flex items-center gap-2">
           <span className="font-semibold tracking-wide">
-            {isDraft ? '✏️ Edit Draft' : replyData ? '↩️ Reply' : '✉️ Compose'}
+            {isDraft ? "✏️ Edit Draft" : replyData ? "↩️ Reply" : "✉️ Compose"}
           </span>
           {isDraft && (
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
@@ -395,7 +433,7 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
         <div className="flex-1 flex items-center justify-between w-full h-full px-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">
-              {isDraft ? '✏️ Draft' : replyData ? '↩️ Reply' : '✉️ Compose'}
+              {isDraft ? "✏️ Draft" : replyData ? "↩️ Reply" : "✉️ Compose"}
             </span>
             {subject && (
               <span className="text-xs text-gray-500 truncate max-w-32">
@@ -418,7 +456,10 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
           </Button>
         </div>
       ) : (
-        <form className="flex flex-col flex-1 p-4 gap-3 overflow-auto" onSubmit={handleSend}>
+        <form
+          className="flex flex-col flex-1 p-4 gap-3 overflow-auto"
+          onSubmit={handleSend}
+        >
           <Input
             type="email"
             placeholder="To"
@@ -444,10 +485,25 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
             className="flex-1 min-h-[8rem] resize-none"
             disabled={loading}
           />
+          <AttachmentUpload
+            files={attachments}
+            onChange={setAttachments}
+            disabled={loading}
+          />
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm flex items-center gap-2">
               <span>⚠️</span>
-              <span>{error}</span>
+              <span>
+                {typeof error === "string"
+                  ? error
+                  : (() => {
+                      try {
+                        return JSON.stringify(error);
+                      } catch {
+                        return "An error occurred";
+                      }
+                    })()}
+              </span>
             </div>
           )}
           {success && (
@@ -507,11 +563,7 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
               >
                 💾 {isDraft ? "Update" : "Save"}
               </Button>
-              <Button
-                type="submit"
-                variant="default"
-                disabled={loading}
-              >
+              <Button type="submit" variant="default" disabled={loading}>
                 {loading ? "Sending..." : isDraft ? "📤 Send Draft" : "📤 Send"}
               </Button>
             </div>
@@ -522,4 +574,4 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   );
 };
 
-export default ComposeEmail; 
+export default ComposeEmail;
