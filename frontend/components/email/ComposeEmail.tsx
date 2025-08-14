@@ -3,14 +3,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
-  sendEmail,
   getEmailSuggestions,
   createDraft,
   updateDraft,
   deleteDraft,
   type Draft,
 } from "@/lib/api/email";
+import { useSendEmail } from "@/lib/queries";
 import AttachmentUpload from "@/components/email/AttachmentUpload";
+import { Send, Save, Wand2 } from "lucide-react";
 import { useApp } from "@/components/AppContext";
 
 interface ComposeEmailProps {
@@ -115,6 +116,7 @@ export function useComposeModal() {
 const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
   const { replyData, draftData, onDraftSaved } = useComposeModal();
   const { triggerRefresh } = useApp();
+  const sendEmailMutation = useSendEmail();
   const [to, setTo] = useState(initialState.to);
   const [subject, setSubject] = useState(initialState.subject);
   const [body, setBody] = useState(initialState.body);
@@ -253,8 +255,7 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
         .map((email) => email.trim())
         .filter((email) => email);
 
-      // Send the email using the existing working sendEmail function
-      await sendEmail({
+      await sendEmailMutation.mutateAsync({
         body,
         recipients,
         subject: subject || "No Subject",
@@ -549,8 +550,12 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
                 onClick={handleGetSuggestions}
                 disabled={loading || suggestionsLoading}
                 size="sm"
+                className="gap-2"
               >
-                {suggestionsLoading ? "✨ Getting..." : "✨ AI Help"}
+                <Wand2 className="w-4 h-4" />
+                {suggestionsLoading
+                  ? "Getting suggestion..."
+                  : "Get suggestion"}
               </Button>
             </div>
             <div className="flex gap-2">
@@ -560,11 +565,19 @@ const ComposeEmail: React.FC<ComposeEmailProps> = ({ open, onClose }) => {
                 onClick={handleSaveDraft}
                 disabled={loading}
                 size="sm"
+                className="gap-2"
               >
-                💾 {isDraft ? "Update" : "Save"}
+                <Save className="w-4 h-4" />
+                {isDraft ? "Update draft" : "Save as draft"}
               </Button>
-              <Button type="submit" variant="default" disabled={loading}>
-                {loading ? "Sending..." : isDraft ? "📤 Send Draft" : "📤 Send"}
+              <Button
+                type="submit"
+                variant="default"
+                disabled={loading}
+                className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              >
+                <Send className="w-4 h-4" />
+                {loading ? "Sending..." : isDraft ? "Send draft" : "Send"}
               </Button>
             </div>
           </div>

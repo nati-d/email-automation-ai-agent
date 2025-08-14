@@ -1,8 +1,27 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ArrowLeft, Archive, Trash, MailOpen, MoreVertical, Star, Printer, ExternalLink, Info } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  ArrowLeft,
+  Archive,
+  Trash,
+  MailOpen,
+  MoreVertical,
+  Star,
+  Printer,
+  ExternalLink,
+  Info,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import React from "react";
 
 interface EmailHeaderProps {
@@ -11,9 +30,21 @@ interface EmailHeaderProps {
   date: string;
   onBack: () => void;
   isDraft?: boolean;
+  onPrint?: () => void;
+  onOpenNewWindow?: () => void;
+  onShowOriginal?: () => void;
 }
 
-export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date, onBack, isDraft = false }) => (
+export const EmailHeader: React.FC<EmailHeaderProps> = ({
+  subject,
+  sender,
+  date,
+  onBack,
+  isDraft = false,
+  onPrint,
+  onOpenNewWindow,
+  onShowOriginal,
+}) => (
   <header className="flex items-center justify-between py-4 px-2 bg-card shadow-sm">
     <div className="flex items-center gap-4">
       <Tooltip>
@@ -24,7 +55,7 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
             aria-label="Back to inbox"
             onClick={onBack}
             className="rounded-full p-0 w-10 h-10 flex items-center justify-center hover:bg-muted focus:ring-2 focus:ring-primary/50"
-            style={{ marginLeft: '-4px' }}
+            style={{ marginLeft: "-4px" }}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -43,7 +74,12 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
     <div className="flex items-center gap-2">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Archive" className="hover:bg-muted">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Archive"
+            className="hover:bg-muted"
+          >
             <Archive className="h-5 w-5" />
           </Button>
         </TooltipTrigger>
@@ -51,7 +87,12 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Delete" className="hover:bg-muted">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Delete"
+            className="hover:bg-muted"
+          >
             <Trash className="h-5 w-5" />
           </Button>
         </TooltipTrigger>
@@ -59,7 +100,12 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label="Mark as unread" className="hover:bg-muted">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Mark as unread"
+            className="hover:bg-muted"
+          >
             <MailOpen className="h-5 w-5" />
           </Button>
         </TooltipTrigger>
@@ -69,7 +115,12 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="More options" className="hover:bg-muted">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="More options"
+                className="hover:bg-muted"
+              >
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -81,15 +132,15 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
             <Star className="mr-2 h-4 w-4" />
             <span>Add to Starred</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={onPrint}>
             <Printer className="mr-2 h-4 w-4" />
             <span>Print</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={onOpenNewWindow}>
             <ExternalLink className="mr-2 h-4 w-4" />
             <span>Open in new window</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={onShowOriginal}>
             <Info className="mr-2 h-4 w-4" />
             <span>Show original</span>
           </DropdownMenuItem>
@@ -97,4 +148,4 @@ export const EmailHeader: React.FC<EmailHeaderProps> = ({ subject, sender, date,
       </DropdownMenu>
     </div>
   </header>
-); 
+);

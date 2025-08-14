@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Email, Category } from "./types";
+import { apiRequest } from "./axiosConfig";
 
 interface EmailResponse {
   emails: Email[];
@@ -19,60 +20,33 @@ interface SendEmailData {
   attachments?: File[];
 }
 
-// API endpoints - point to backend server
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+// API endpoints - relative, axios baseURL handles prefix
 const ENDPOINTS = {
-  emails: `${API_BASE}/emails`,
-  inbox: `${API_BASE}/emails/inbox`,
-  tasks: `${API_BASE}/emails/tasks`,
-  categories: `${API_BASE}/categories`,
-  categoryEmails: (categoryName: string) =>
-    `${API_BASE}/emails/category/${categoryName}`,
-  recategorizeEmails: `${API_BASE}/categories/recategorize-emails`,
+  emails: `/emails`,
+  inbox: `/emails/inbox`,
+  tasks: `/emails/tasks`,
+  sent: `/emails/sent`,
+  starred: `/emails/starred`,
+  categories: `/categories`,
+  categoryEmails: (categoryName: string) => `/emails/category/${categoryName}`,
+  recategorizeEmails: `/categories/recategorize-emails`,
+  emailById: (id: string) => `/emails/${id}`,
+  sentById: (id: string) => `/emails/sent/${id}`,
 };
 
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const sessionId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("auth-session-id")
-      : null;
-  return {
-    "Content-Type": "application/json",
-    ...(sessionId && { Authorization: `Bearer ${sessionId}` }),
-  };
-};
-
-// Helper function for authenticated fetch
-const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-  const sessionId =
-    typeof window !== "undefined"
-      ? localStorage.getItem("auth-session-id")
-      : null;
-
-  const headers: Record<string, string> = {
-    ...(options.headers as Record<string, string>),
-    ...(sessionId && { Authorization: `Bearer ${sessionId}` }),
-  };
-
-  // Don't set Content-Type for FormData (let browser set it with boundary)
-  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+// Use axios client to benefit from interceptors
+const axiosGet = async <T>(
+  url: string,
+  params?: Record<string, any>
+): Promise<T> => {
+  const res = await apiRequest<T>({ url, method: "GET", params });
+  // @ts-expect-error generic axios wrapper returns data in .data
+  return res.data;
 };
 
 // Fetch single email
 const fetchEmail = async (emailId: string): Promise<Email> => {
-  const response = await authenticatedFetch(`${ENDPOINTS.emails}/${emailId}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch email");
-  }
-  return response.json();
+  return axiosGet<Email>(ENDPOINTS.emailById(emailId));
 };
 
 // Fetch emails with limit parameter
@@ -80,11 +54,7 @@ const fetchEmails = async (
   endpoint: string,
   limit = 50
 ): Promise<EmailResponse> => {
-  const response = await authenticatedFetch(`${endpoint}?limit=${limit}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch emails");
-  }
-  return response.json();
+  return axiosGet<EmailResponse>(endpoint, { limit });
 };
 
 // Query hooks
@@ -120,15 +90,8 @@ export const useAllEmails = (limit = 50) => {
 export const useCategoryEmails = (categoryName: string) => {
   return useQuery({
     queryKey: ["emails", "category", categoryName],
-    queryFn: async () => {
-      const response = await authenticatedFetch(
-        ENDPOINTS.categoryEmails(categoryName)
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch category emails");
-      }
-      return response.json() as Promise<EmailResponse>;
-    },
+    queryFn: async () =>
+      axiosGet<EmailResponse>(ENDPOINTS.categoryEmails(categoryName)),
   });
 };
 
@@ -159,16 +122,11 @@ export const useSummarizeEmail = () => {
 export const useCategories = (includeInactive = false) => {
   return useQuery({
     queryKey: ["categories", includeInactive],
-    queryFn: async () => {
-      const response = await authenticatedFetch(
-        `${ENDPOINTS.categories}?include_inactive=${includeInactive}`
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch categories");
-      }
-      const data = await response.json();
-      return data; // Returns { categories: Category[], total_count: number }
-    },
+    queryFn: async () =>
+      axiosGet<{ categories: Category[]; total_count: number }>(
+        ENDPOINTS.categories,
+        { include_inactive: includeInactive }
+      ),
   });
 };
 
@@ -179,17 +137,12 @@ export const useCreateCategory = () => {
     mutationFn: async (
       category: Omit<Category, "id" | "created_at" | "updated_at">
     ) => {
-      const response = await authenticatedFetch(ENDPOINTS.categories, {
+      const res = await apiRequest<Category>({
+        url: ENDPOINTS.categories,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(category),
+        data: category,
       });
-      if (!response.ok) {
-        throw new Error("Failed to create category");
-      }
-      return response.json() as Promise<Category>;
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
@@ -208,20 +161,12 @@ export const useUpdateCategory = () => {
       categoryId: string;
       data: Partial<Category>;
     }) => {
-      const response = await authenticatedFetch(
-        `${ENDPOINTS.categories}/${categoryId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(data),
-        }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to update category");
-      }
-      return response.json() as Promise<Category>;
+      const res = await apiRequest<Category>({
+        url: `${ENDPOINTS.categories}/${categoryId}`,
+        method: "PUT",
+        data,
+      });
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
@@ -234,15 +179,10 @@ export const useDeleteCategory = () => {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await authenticatedFetch(
-        `${ENDPOINTS.categories}/${id}`,
-        {
-          method: "DELETE",
-        }
-      );
-      if (!response.ok) {
-        throw new Error("Failed to delete category");
-      }
+      await apiRequest({
+        url: `${ENDPOINTS.categories}/${id}`,
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
@@ -256,13 +196,11 @@ export const useRecategorizeEmails = () => {
 
   return useMutation({
     mutationFn: async () => {
-      const response = await authenticatedFetch(ENDPOINTS.recategorizeEmails, {
+      const res = await apiRequest({
+        url: ENDPOINTS.recategorizeEmails,
         method: "POST",
       });
-      if (!response.ok) {
-        throw new Error("Failed to recategorize emails");
-      }
-      return response.json();
+      return res.data as any;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emails"] });
@@ -377,19 +315,16 @@ export const useSendEmail = () => {
         });
       }
 
-      const response = await authenticatedFetch(`${ENDPOINTS.emails}/send`, {
+      const res = await apiRequest({
+        url: `${ENDPOINTS.emails}/send`,
         method: "POST",
-        body: formData,
+        data: formData,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to send email");
-      }
-
-      return response.json();
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emails"] });
+      queryClient.invalidateQueries({ queryKey: ["emails", "sent"] });
     },
   });
 };
@@ -398,7 +333,7 @@ export const useSendEmail = () => {
 export function useTasks() {
   return useQuery({
     queryKey: ["tasks"],
-    queryFn: () => authenticatedFetch(`${ENDPOINTS.tasks}`),
+    queryFn: () => axiosGet(`${ENDPOINTS.tasks}`),
   });
 }
 
@@ -412,13 +347,11 @@ export function useUpdateTask() {
       dueDate?: string | null;
       isCompleted?: boolean;
     }) =>
-      authenticatedFetch(`${ENDPOINTS.tasks}/${data.taskId}`, {
+      apiRequest({
+        url: `${ENDPOINTS.tasks}/${data.taskId}`,
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      }),
+        data,
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -430,9 +363,10 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: (taskId: string) =>
-      authenticatedFetch(`${ENDPOINTS.tasks}/${taskId}`, {
+      apiRequest({
+        url: `${ENDPOINTS.tasks}/${taskId}`,
         method: "DELETE",
-      }),
+      }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -481,3 +415,26 @@ export function useRemoveEmailAccount() {
     },
   });
 }
+
+// Additional hooks: sent, starred, sentById
+export const useSentEmails = (limit = 50) => {
+  return useQuery({
+    queryKey: ["emails", "sent", limit],
+    queryFn: () => fetchEmails(ENDPOINTS.sent, limit),
+  });
+};
+
+export const useStarredEmails = (limit = 50) => {
+  return useQuery({
+    queryKey: ["emails", "starred", limit],
+    queryFn: () => fetchEmails(ENDPOINTS.starred, limit),
+  });
+};
+
+export const useSentEmailById = (emailId: string) => {
+  return useQuery({
+    queryKey: ["email", "sent", emailId],
+    queryFn: () => axiosGet<Email>(ENDPOINTS.sentById(emailId)),
+    enabled: Boolean(emailId),
+  });
+};
